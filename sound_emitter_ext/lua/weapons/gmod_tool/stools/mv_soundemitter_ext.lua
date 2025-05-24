@@ -8,9 +8,9 @@ TOOL.ConfigName		= ""
 
 TOOL.ClientConVar[ "model" ]		= "models/props_lab/citizenradio.mdl"
 TOOL.ClientConVar[ "sound" ] 		= "coast.siren_citizen"
-TOOL.ClientConVar[ "length" ]		= "-1"
+TOOL.ClientConVar[ "length" ]		= "0"
 TOOL.ClientConVar[ "autolength"  ]	= "0"
-TOOL.ClientConVar[ "looping" ]		= "1"
+TOOL.ClientConVar[ "looping" ]		= "0"
 TOOL.ClientConVar[ "delay" ]		= "0"
 TOOL.ClientConVar[ "toggle" ]		= "0"
 TOOL.ClientConVar[ "dmgactivate" ] 	= "0"
@@ -23,8 +23,11 @@ TOOL.ClientConVar[ "reverse" ]		= "0"
 
 
 if SERVER then
-	if !ConVarExists("sbox_maxmv_soundemitters") then
-		CreateConVar("sbox_maxmv_soundemitters",3)
+	if !ConVarExists( "sbox_maxmv_soundemitters" ) then
+		CreateConVar( "sbox_maxmv_soundemitters", 3 )
+	end
+	if !ConVarExists( "sv_mv_soundemitters_min__loop_length" ) then
+		CreateConVar( "sv_mv_soundemitters_min_loop_length", game.SinglePlayer() and 0 or 0.05 )
 	end
 elseif CLIENT then
 
@@ -82,6 +85,7 @@ elseif SERVER then
 		if not isMSE( emitter ) then return end
 
 		if ply and not emitter:GetPlayer():IsPlayer() then emitter:SetPlayer(ply) end
+		ply = emitter:GetPlayer()
 
 		if pitch then
 			pitch = math.Clamp(pitch, 0, 255)
@@ -89,6 +93,15 @@ elseif SERVER then
 				length = ( pitch <= 0 ) and -1 or ( SoundDuration( sound ) * 100 / pitch ) -- pitch is in percentage
 			end
 		end	
+
+		if looping and length and length > 0 then
+			local cvar = GetConVar( "sv_mv_soundemitters_min_loop_length" )
+			local minLength = cvar and cvar:GetFloat() or 0
+			if length < minLength then
+				if ply then ply:ChatPrint("Play length too short: changed from "..length.." to "..math.Round(minLength,2).." second(s).") end
+				length = minLength
+			end
+		end
 
 		local emitterProperties = {
 			sound 		= "Sound",
@@ -315,8 +328,11 @@ function TOOL.BuildCPanel(cpanel)
 	local panel = cpanel:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
 		panel:SetToolTip( "The pitch percentage of the sound." )
 	
-	local panel = cpanel:NumSlider( "Play Length", mode.."_length", -1, 300 )
-		panel:SetToolTip( "How long before the sound stops or repeats, in seconds.\nSet to below 0 for infinite." )
+	local panel = cpanel:NumSlider( "Initial Delay", mode.."_delay", 0, 100 )
+		panel:SetToolTip( "How many seconds to wait before starting the sound emitter." )
+
+	local panel = cpanel:NumSlider( "Play Length", mode.."_length", 0, 300 )
+		panel:SetToolTip( "How long before the sound stops or repeats, in seconds.\nSet to 0 or below for infinite duration." )
 
 	local checkbox = cpanel:CheckBox( "Calculate length", mode.."_autolength" )
 		checkbox:SetToolTip( "Set the play length to the approximate length of the sound.\nThis can be inaccurate for self-looping sounds." )
@@ -324,9 +340,6 @@ function TOOL.BuildCPanel(cpanel)
 	function checkbox:OnChange( isChecked )
 		panel:SetEnabled( not isChecked )
 	end
-
-	local panel = cpanel:NumSlider( "Initial Delay", mode.."_delay", 0, 100 )
-		panel:SetToolTip( "How long to wait before playing the sound (seconds)." )
 
 	local panel = cpanel:CheckBox( "Toggle", mode.."_toggle" )
 		panel:SetToolTip( "Toggle turning the sound emitter on and off." )
