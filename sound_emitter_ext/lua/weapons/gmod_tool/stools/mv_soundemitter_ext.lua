@@ -16,10 +16,9 @@ TOOL.ClientConVar[ "toggle" ]		= "0"
 TOOL.ClientConVar[ "dmgactivate" ] 	= "0"
 TOOL.ClientConVar[ "dmgtoggle" ] 	= "0"
 TOOL.ClientConVar[ "key"    ] 		= "38"
-TOOL.ClientConVar[ "volume" ]		= "100"
+TOOL.ClientConVar[ "volume" ]		= "1"
 TOOL.ClientConVar[ "pitch"  ]		= "100"
 TOOL.ClientConVar[ "reverse" ]		= "0"
-
 
 
 if SERVER then
@@ -47,21 +46,18 @@ elseif CLIENT then
 	language.Add( "Undone_mode", "Undone Sound Emitter" )
 	language.Add( "Cleanup_mode", "Sound Emitters" )
 	language.Add( "Cleaned_mode", "Cleaned up all Sound Emitters" )
+	
 end
 
 cleanup.Register( "mv_soundemitter" )
 
-
---DEPRECATED except if people modify the txt file
-
+-- Not used
 if file.Exists("soundemitter_ext/custom_sound_presets.txt", "DATA") then
 	local SoundPresets = util.KeyValuesToTable(file.Read("soundemitter_ext/custom_sound_presets.txt", "DATA"))
 	for key, value in pairs(SoundPresets) do
 		list.Set( "MVSoundEmitterExtSound", key, value )
 	end
 end
-
-
 
 /*----------------------------
 --		   FUNCTIONS	    --
@@ -299,7 +295,7 @@ function TOOL.BuildCPanel(cpanel)
 	local panel = cpanel:KeyBinder( "Sound Emitter Key", mode.."_key" )
 		panel:SetToolTip("The keyboard key that sets on or off the sound emitter")
 	
-	cpanel:PropSelect("Model", mode.."_model", list.Get("MVSoundEmitterModel"))	
+	cpanel:PropSelect("Preset Models", mode.."_model", list.Get("MVSoundEmitterModel"), 3)
 	cpanel:TextEntry( "Model:", mode.."_model" )
 
 	local listview = vgui.Create( "DListView" )
@@ -322,8 +318,8 @@ function TOOL.BuildCPanel(cpanel)
 	local panel = cpanel:TextEntry( "Sound:", mode.."_sound" )
 		panel:SetToolTip( "A in-game sound name. Can be a .wav sound path or a soundscript." )
 
-	local panel = cpanel:NumSlider( "Volume", mode.."_volume", 0, 100 )
-		panel:SetToolTip( "The loudness of the sound, in percentage of max volume." )
+	local panel = cpanel:NumSlider( "Volume", mode.."_volume", 0, 1 )
+		panel:SetToolTip( "The loudness of the sound, in proportion of max volume." )
 
 	local panel = cpanel:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
 		panel:SetToolTip( "The pitch percentage of the sound." )
@@ -400,24 +396,3 @@ function TOOL:Think()
 	self:UpdateGhostMVSoundEmitter( self.GhostEntity, self:GetOwner() )
 
 end
-
-
-/*----------------------------
---		    MODELS		    --
-----------------------------*/
-
-
-list.Set( "MVSoundEmitterModel", "models/props_lab/citizenradio.mdl", {})
-list.Set( "MVSoundEmitterModel", "models/Items/car_battery01.mdl", {})
-list.Set( "MVSoundEmitterModel", "models/props_c17/TrapPropeller_Engine.mdl", {})
-list.Set( "MVSoundEmitterModel", "models/props_c17/tv_monitor01.mdl", {})
-list.Set( "MVSoundEmitterModel", "models/props_wasteland/SpeakerCluster01a.mdl", {})
-list.Set( "MVSoundEmitterModel", "models/props_trainstation/payphone001a.mdl", {})
---list.Set( "MVSoundEmitterModel", "models/props_italian/gramophone.mdl", {})
-
-
-/* enable these if you have them
-list.Set( "MVSoundEmitterModel", "models/jaanus/thruster_megaphn.mdl", {})
-list.Set( "MVSoundEmitterModel", "models/jaanus/thruster_shoop.mdl", {})
-list.Set( "MVSoundEmitterModel", "models/jaanus/thruster_invisi.mdl", {})
-*/

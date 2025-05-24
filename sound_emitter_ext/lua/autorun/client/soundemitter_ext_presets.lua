@@ -1,4 +1,30 @@
-local function f(tag, label, sound)
+local function f( model )
+	if not model then return end
+	list.Set( "MVSoundEmitterModel", model, {})
+end
+
+f( "models/props_lab/citizenradio.mdl" )
+f( "models/Items/car_battery01.mdl" )
+f( "models/props_c17/TrapPropeller_Engine.mdl" )
+f( "models/props_c17/tv_monitor01.mdl" )
+f( "models/props_wasteland/SpeakerCluster01a.mdl" )
+f( "models/props_trainstation/payphone001a.mdl" )
+f( "models/props_lab/reciever01a.mdl" )
+f( "models/props_lab/reciever01b.mdl" )
+f( "models/props_c17/consolebox01a.mdl" )
+f( "models/props_c17/consolebox03a.mdl" )
+f( "models/props_c17/consolebox05a.mdl" )
+f( "models/props_lab/plotter.mdl" )
+f( "models/props_trainstation/payphone_reciever001a.mdl" )
+--[[ enable these if you have them
+f( "models/props_italian/gramophone.mdl" )
+f( "MVSoundEmitterModel", "models/jaanus/thruster_megaphn.mdl" )
+f( "MVSoundEmitterModel", "models/jaanus/thruster_shoop.mdl" )
+f( "MVSoundEmitterModel", "models/jaanus/thruster_invisi.mdl" )
+]]
+
+
+local function f( tag, label, sound )
 	if not ( label and sound ) then return end
 	if tag then label = tag.." "..label end
 	list.Set( "MVSoundEmitterExtSound", label, {
