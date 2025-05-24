@@ -1,8 +1,7 @@
-
 local function f(tag, label, sound)
 	if not ( label and sound ) then return end
 	if tag then label = tag.." "..label end
-	list.Set( "MVSoundEmitterSound", label, {
+	list.Set( "MVSoundEmitterExtSound", label, {
 		mv_soundemitter_ext_sound = sound
 	})
 end

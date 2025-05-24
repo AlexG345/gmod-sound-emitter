@@ -18,6 +18,7 @@ TOOL.ClientConVar[ "dmgtoggle" ] 	= "0"
 TOOL.ClientConVar[ "key"    ] 		= "38"
 TOOL.ClientConVar[ "volume" ]		= "100"
 TOOL.ClientConVar[ "pitch"  ]		= "100"
+TOOL.ClientConVar[ "reverse" ]		= "0"
 
 
 
@@ -48,14 +49,15 @@ end
 cleanup.Register( "mv_soundemitter" )
 
 
--- DEPRECATED except if people modify the txt file
+--DEPRECATED except if people modify the txt file
 
 if file.Exists("soundemitter_ext/custom_sound_presets.txt", "DATA") then
 	local SoundPresets = util.KeyValuesToTable(file.Read("soundemitter_ext/custom_sound_presets.txt", "DATA"))
 	for key, value in pairs(SoundPresets) do
-		list.Set( "MVSoundEmitterSound", key, value )
+		list.Set( "MVSoundEmitterExtSound", key, value )
 	end
 end
+
 
 
 /*----------------------------
@@ -75,7 +77,7 @@ if CLIENT then
 elseif SERVER then
 
 
-	local function updateMSE( emitter, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, ply, nocollide, autolength )
+	local function updateMSE( emitter, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, ply, nocollide, autolength, reverse )
 
 		if not isMSE( emitter ) then return end
 
@@ -86,7 +88,7 @@ elseif SERVER then
 			if autolength and sound then
 				length = ( pitch <= 0 ) and -1 or ( SoundDuration( sound ) * 100 / pitch ) -- pitch is in percentage
 			end
-		end
+		end	
 
 		local emitterProperties = {
 			sound 		= "Sound",
@@ -98,7 +100,9 @@ elseif SERVER then
 			dmgtoggle	= "DamageToggle",
 			volume		= "Volume",
 			pitch		= "Pitch",
-			key			= "Key"
+			key			= "Key",
+			autolength	= "AutoLength",
+			reverse		= "Reverse"
 		}
 
 		local newProperties = { -- Keys used by the duplicator
@@ -114,8 +118,9 @@ elseif SERVER then
 			pitch		= pitch,
 			key			= key,
 			nocollide 	= nocollide,
+			autolength 	= autolength,
+			reverse 	= reverse
 		}
-		
 
 		for duName, value in pairs( newProperties ) do
 			if value ~= nil then
@@ -127,14 +132,20 @@ elseif SERVER then
 
 		if nocollide then emitter:GetPhysicsObject():EnableCollisions( false ) end
 
+		if reverse then emitter:PreEmit() end
+
 	end
 
-	-- added local might fix override issue (not tested yet)
-	local function MakeMVSoundEmitter(  ply, pos, ang, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, nocollide, autolength  )
+	
+	local function MakeMVSoundEmitter(  ply, pos, ang, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, nocollide, autolength, reverse  )
 
 		if not ply:CheckLimit( "mv_soundemitters" ) then return false end
 
-		if not util.IsModelLoaded( model ) then ply:ChatPrint("Invalid model!") return false end
+		if not ( model and model ~= "" and util.IsModelLoaded( model ) ) then
+			ply:ChatPrint("Invalid model!")
+			-- ply:EmitSound("buttons/button10.wav")
+			return false
+		end
 
 		local emitter = ents.Create( "mv_soundemitter" )
 		if not emitter:IsValid() then return false end
@@ -143,7 +154,7 @@ elseif SERVER then
 		emitter:SetAngles( ang )
 		emitter:SetModel( model )
 		emitter:Spawn()
-		updateMSE( emitter, nil, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, ply, nocollide, autolength )
+		updateMSE( emitter, nil, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, ply, nocollide, autolength, reverse )
 
 		ply:AddCount( "mv_soundemitters", emitter )
 		ply:AddCleanup( "mv_soundemitter", emitter )
@@ -154,7 +165,7 @@ elseif SERVER then
 	end
 
 
-	duplicator.RegisterEntityClass( "mv_soundemitter", MakeMVSoundEmitter, "pos", "ang", "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide" )
+	duplicator.RegisterEntityClass( "mv_soundemitter", MakeMVSoundEmitter, "pos", "ang", "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse" )
 
 
 	function TOOL:LeftClick( trace, do_weld )
@@ -180,10 +191,11 @@ elseif SERVER then
 		local pitch 		= self:GetClientNumber( "pitch" )
 		local key   		= self:GetClientNumber( "key" )
 		local autolength	= self:GetClientBool( "autolength" )
+		local reverse		= self:GetClientBool( "reverse" )
 		
 		if isMSE( ent ) and ( ent:GetPlayer() == ply ) then
 
-			updateMSE( ent, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, nil, nil, autolength )
+			updateMSE( ent, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, nil, nil, autolength, reverse )
 			return true
 
 		end
@@ -192,7 +204,7 @@ elseif SERVER then
 		local ang = trace.HitNormal:Angle()
 		ang.pitch = ang.pitch + 90
 
-		local emitter = MakeMVSoundEmitter( ply, pos, ang, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, false, autolength )
+		local emitter = MakeMVSoundEmitter( ply, pos, ang, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, false, autolength, reverse )
 
 		if not emitter then return false end
 
@@ -243,6 +255,8 @@ elseif SERVER then
 			ply:ConCommand(mode.."_dmgtoggle "..tostring(ent:GetDamageToggle()))
 			ply:ConCommand(mode.."_volume "..tostring(ent:GetVolume()))
 			ply:ConCommand(mode.."_pitch "..tostring(ent:GetPitch()))
+			ply:ConCommand(mode.."_autolength "..tostring(ent:GetAutoLength()))
+			ply:ConCommand(mode.."_reverse "..tostring(ent:GetReverse()))
 
 			-- Fix for copying original addon sound emitters. Their getter function always return 0...
 			local key = ent:GetKey()
@@ -269,7 +283,8 @@ function TOOL.BuildCPanel(cpanel)
 
 	cpanel:ToolPresets( mode, cvarList )
 
-	cpanel:KeyBinder( "Sound Emitter Key", mode.."_key" )
+	local panel = cpanel:KeyBinder( "Sound Emitter Key", mode.."_key" )
+		panel:SetToolTip("The keyboard key that sets on or off the sound emitter")
 	
 	cpanel:PropSelect("Model", mode.."_model", list.Get("MVSoundEmitterModel"))	
 	cpanel:TextEntry( "Model:", mode.."_model" )
@@ -278,7 +293,7 @@ function TOOL.BuildCPanel(cpanel)
 		listview:SetSize( 80,200 )
 		listview:SetMultiSelect( false )
 		listview:AddColumn( "Preset Sounds" )
-		for soundName, _ in pairs(list.Get("MVSoundEmitterSound")) do
+		for soundName, _ in pairs(list.Get("MVSoundEmitterExtSound")) do
 			listview:AddLine( soundName )
 		end
 		listview:SortByColumn( 1 )
@@ -286,45 +301,52 @@ function TOOL.BuildCPanel(cpanel)
 		local command = "mv_soundemitter_ext_sound"
 		listview.OnRowSelected = function( panel, rowIndex, row )
 			-- Get the soundname at this cell
-			local parameter = list.Get("MVSoundEmitterSound")[row:GetValue( 1 )][ command ]
-			LocalPlayer():ConCommand( command.." "..parameter )
+			local parameter = list.Get("MVSoundEmitterExtSound")[row:GetValue( 1 )][ command ]
+			if parameter then LocalPlayer():ConCommand( command.." "..parameter ) end
 		end
 	cpanel:AddItem( listview )
 
-	cpanel:TextEntry( "Sound:", mode.."_sound" )
+	local panel = cpanel:TextEntry( "Sound:", mode.."_sound" )
+		panel:SetToolTip( "A in-game sound name. Can be a .wav sound path or a soundscript." )
 
-	cpanel:NumSlider( "Volume", mode.."_volume", 0, 100 )
-		cpanel:ControlHelp( "Adjust the loudness of the sound, in percentage of max volume.\n" )
+	local panel = cpanel:NumSlider( "Volume", mode.."_volume", 0, 100 )
+		panel:SetToolTip( "The loudness of the sound, in percentage of max volume." )
 
-	cpanel:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
-		cpanel:ControlHelp( "Adjust the pitch of the sound.\n" )
+	local panel = cpanel:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
+		panel:SetToolTip( "The pitch percentage of the sound." )
 	
-	local numslider = cpanel:NumSlider( "Play Length", mode.."_length", -1, 300 )
-		local chelp = cpanel:ControlHelp( "How long before the sound stops or repeats (seconds). Set to below 0 for infinite.\n" )
+	local panel = cpanel:NumSlider( "Play Length", mode.."_length", -1, 300 )
+		panel:SetToolTip( "How long before the sound stops or repeats, in seconds.\nSet to below 0 for infinite." )
 
 	local checkbox = cpanel:CheckBox( "Calculate length", mode.."_autolength" )
-		cpanel:ControlHelp( "Set the play length to the approximate length of the sound (inaccurate for self-looping sounds)." )
+		checkbox:SetToolTip( "Set the play length to the approximate length of the sound.\nThis can be inaccurate for self-looping sounds." )
 	
 	function checkbox:OnChange( isChecked )
-		numslider:SetEnabled( not isChecked )
-		chelp:SetEnabled( not isChecked )
+		panel:SetEnabled( not isChecked )
 	end
 
-	cpanel:NumSlider( "Initial Delay", mode.."_delay", 0, 100 )
-		cpanel:ControlHelp( "How long to wait before playing the sound (seconds).\n" )
+	local panel = cpanel:NumSlider( "Initial Delay", mode.."_delay", 0, 100 )
+		panel:SetToolTip( "How long to wait before playing the sound (seconds)." )
 
-	cpanel:CheckBox( "Toggle", mode.."_toggle" )
-		cpanel:ControlHelp( "Toggle turning the sound emitter on and off\n" )
+	local panel = cpanel:CheckBox( "Toggle", mode.."_toggle" )
+		panel:SetToolTip( "Toggle turning the sound emitter on and off." )
 
-	cpanel:CheckBox( "Loop", mode.."_looping" )
-		cpanel:ControlHelp( "If this is checked, the sound will loop after the play length is over. Self-looping sounds don't need this to loop.\n" )
-
-	cpanel:CheckBox( "Activate on Damage", mode.."_dmgactivate" )
-		cpanel:ControlHelp( "The emitter will activate if something damages it.\n" )
-
-	cpanel:CheckBox( "Toggle on Damage", mode.."_dmgtoggle" )
-		cpanel:ControlHelp( "If something damages the emitter it will toggle but only if 'Activate on Damage' is on." )
+	local panel = cpanel:CheckBox( "Reverse", mode.."_reverse" )
+		panel:SetToolTip( "Reverse the activation order." )
 	
+	local panel = cpanel:CheckBox( "Loop", mode.."_looping" )
+		panel:SetToolTip( "Replay the sound after the play length is over.\nFor self-looping sounds it's better to set this off and the play length to -1." )
+
+	local checkbox = cpanel:CheckBox( "Activate on Damage", mode.."_dmgactivate" )
+		checkbox:SetToolTip( "The emitter will activate if something damages it." )
+
+	local panel = cpanel:CheckBox( "Toggle on Damage", mode.."_dmgtoggle" )
+		panel:SetToolTip( "If something damages the emitter it will toggle but only if 'Activate on Damage' is on." )
+	
+	function checkbox:OnChange( isChecked )
+		panel:SetEnabled( isChecked )
+	end
+
 end
 
 

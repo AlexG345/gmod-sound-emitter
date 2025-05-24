@@ -55,17 +55,28 @@ ENT:AccessorFuncENT( "DamageToggle", "DamageToggle", false, ENT.TYPE_BOOL )
 ENT:AccessorFuncENT( "Volume", "Volume", 100, ENT.TYPE_FLOAT )
 ENT:AccessorFuncENT( "Pitch", "Pitch", 100, ENT.TYPE_FLOAT )
 ENT:AccessorFuncENT( "Key", "Key", 41, ENT.TYPE_INT )
+ENT:AccessorFuncENT( "AutoLength", "AutoLength", false, ENT.TYPE_BOOL )
+ENT:AccessorFuncENT( "Reverse", "Reverse", false, ENT.TYPE_BOOL )
 ENT:AccessorFuncENT( "On", "Active", false, ENT.TYPE_BOOL )
 
-setter = ENT["SetKey"]
+local setter = ENT["SetKey"]
 ENT["SetKey"] = function( self, key )
 	key = key or 41
 	setter( self, key )
 	if self.impulseDown then numpad.Remove( self.impulseDown ) end
 	if self.impulseUp   then numpad.Remove( self.impulseUp	) end
-	ply = self:GetPlayer()
-	self.impulseDown = numpad.OnDown( ply, key, "mv_soundemitter_Down",	self )
-	self.impulseUp	 = numpad.OnUp(	  ply, key, "mv_soundemitter_Up",	self )
+	local ply = self:GetPlayer()
+	local act1, act2 = "mv_soundemitter_Down", "mv_soundemitter_Up"
+	if self:GetReverse() then act1, act2 = act2, act1 end
+	self.impulseDown = numpad.OnDown( ply, key, act1, self )
+	self.impulseUp	 = numpad.OnUp(	  ply, key, act2, self )
+end
+
+local setter = ENT["SetReverse"]
+ENT["SetReverse"] = function( self, reverse )
+	if reverse == self:GetReverse() then return end -- nothing to change
+	setter( self, reverse )
+	self:SetKey( self:GetKey() ) -- Will reverse the actions, dirty hack
 end
 
 function ENT:SetSound( s )
