@@ -2,7 +2,7 @@ ENT.Type 				= "anim"
 ENT.Base 				= "base_gmodentity"
 
 ENT.PrintName			= "MV Sound Emitter"
-ENT.Author				= "MajorVictory (fixed by Alex)"
+ENT.Author				= "MajorVictory (+ Alex)"
 ENT.Contact				= ""
 ENT.Purpose				= "To annoy others with your shitty music."
 ENT.Instructions		= ""
@@ -17,9 +17,11 @@ ENT.TYPE_STRING 	= 0
 ENT.TYPE_BOOL		= 1
 ENT.TYPE_INT		= 2
 ENT.TYPE_FLOAT		= 3
--- AccessorFuncNW doesn't work on SENTs
--- so i'll just make my own local one, with emulated constants :P
--- Angle, Vector, and Color not included, do it yourself
+
+/* AccessorFuncNW doesn't work on SENTs
+so i'll just make my own local one, with emulated constants.
+Angle, Vector, and Color not included */
+
 function ENT:AccessorFuncENT( name, varname, varDefault, iType )
 	iType = iType or self.TYPE_STRING
 

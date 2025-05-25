@@ -1,10 +1,7 @@
-
 local mode = TOOL.Mode
 
 TOOL.Category		= "Construction"
 TOOL.Name			= "#Tool."..mode..".name"
-TOOL.Command		= nil
-TOOL.ConfigName		= ""
 
 TOOL.ClientConVar[ "model" ]		= "models/props_lab/citizenradio.mdl"
 TOOL.ClientConVar[ "sound" ] 		= "coast.siren_citizen"
@@ -21,37 +18,9 @@ TOOL.ClientConVar[ "pitch"  ]		= "100"
 TOOL.ClientConVar[ "reverse" ]		= "0"
 
 
-if SERVER then
-	if !ConVarExists( "sbox_maxmv_soundemitters" ) then
-		CreateConVar( "sbox_maxmv_soundemitters", 3 )
-	end
-	if !ConVarExists( "sv_mv_soundemitters_min__loop_length" ) then
-		CreateConVar( "sv_mv_soundemitters_min_loop_length", game.SinglePlayer() and 0 or 0.05 )
-	end
-elseif CLIENT then
-
-	TOOL.Information = {
-		{ name = "left" },
-		{ name = "right" },
-		{ name = "reload" }
-	}
-	
-	language.Add( "Tool."..mode..".name", "Sound Emitter (+)" )
-	language.Add( "Tool."..mode..".desc", "Create a sound emitter" )
-	language.Add( "Tool."..mode..".left", "Create or update a sound emitter" )
-	language.Add( "Tool."..mode..".right", "Same as left click but welds the sound emitter." )
-	language.Add( "Tool."..mode..".reload", "Copy settings or model." )
-
-	language.Add( "SBoxLimit_modes", "You've hit the Sound Emitter limit!" )
-	language.Add( "Undone_mode", "Undone Sound Emitter" )
-	language.Add( "Cleanup_mode", "Sound Emitters" )
-	language.Add( "Cleaned_mode", "Cleaned up all Sound Emitters" )
-	
-end
-
 cleanup.Register( "mv_soundemitter" )
 
--- Not used
+-- Use this if you need more presets?
 if file.Exists("soundemitter_ext/custom_sound_presets.txt", "DATA") then
 	local SoundPresets = util.KeyValuesToTable(file.Read("soundemitter_ext/custom_sound_presets.txt", "DATA"))
 	for key, value in pairs(SoundPresets) do
@@ -59,79 +28,99 @@ if file.Exists("soundemitter_ext/custom_sound_presets.txt", "DATA") then
 	end
 end
 
-/*----------------------------
---		   FUNCTIONS	    --
-----------------------------*/
 
-local function isMSE( emitter )
-	return isentity( emitter) and emitter:IsValid() and ( emitter:GetClass() == "mv_soundemitter" )
+local function isMSE( ent )
+	return isentity( ent ) and ent:IsValid() and ( ent:GetClass() == "mv_soundemitter" )
 end
 
 if CLIENT then
 	
+	TOOL.Information = {
+		{ name = "left" },
+		{ name = "right" },
+		{ name = "reload" }
+	}
+	
+	local t = "Tool."..mode
+	language.Add( t..".name", "Sound Emitter (+)" )
+	language.Add( t..".desc", "Create a sound emitter" )
+	language.Add( t..".left", "Create or update a sound emitter" )
+	language.Add( t..".right", "Same as left click but welds the sound emitter." )
+	language.Add( t..".reload", "Copy settings or model." )
+	t = nil
+
+	language.Add( "SBoxLimit_modes", "You've hit the Sound Emitter limit!" )
+	language.Add( "Undone_mode", "Undone Sound Emitter" )
+	language.Add( "Cleanup_mode", "Sound Emitters" )
+	language.Add( "Cleaned_mode", "Cleaned up all Sound Emitters" )
+
 	function TOOL:LeftClick( trace )	return not( trace.Entity and trace.Entity:IsPlayer() ) end
 	function TOOL:RightClick( trace )	return self:LeftClick( trace ) end
 	function TOOL:Reload( trace )		return isMSE( trace.Entity ) end
 
 elseif SERVER then
 
+	local cvars =  {
+	sbox_maxmv_soundemitters = 3,
+	sv_mv_soundemitters_min_loop_length = game.SinglePlayer() and 0 or 0.05
+	}
+	for name, default in pairs( cvars ) do
+		if !ConVarExists( name ) then CreateConVar( name, default ) end
+	end
+	cvars = nil
 
-	local function updateMSE( emitter, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, ply, nocollide, autolength, reverse )
+	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse" }
+
+	 -- Returns table with keys dupeKeys and values ...
+	local function toMSEProperties( ... )
+		local values = { ... }
+		local t = {}
+		for i, k in ipairs(dupeKeys) do
+			t[k] = values[i]
+		end
+		return t
+	end
+
+	local emitterProperties = toMSEProperties(
+		"Model",
+		"Sound",
+		"Length",
+		"Looping",
+		"Delay",
+		"Toggle",
+		"DamageActivate",
+		"DamageToggle",
+		"Volume",
+		"Pitch",
+		"Key",
+		nil,
+		"AutoLength",
+		"Reverse"
+	)
+
+	local function updateMSE( emitter, ply, t ) -- t = properties table
 
 		if not isMSE( emitter ) then return end
 
 		if ply and not emitter:GetPlayer():IsPlayer() then emitter:SetPlayer(ply) end
 		ply = emitter:GetPlayer()
 
-		if pitch then
-			pitch = math.Clamp(pitch, 0, 255)
-			if autolength and sound then
-				length = ( pitch <= 0 ) and -1 or ( SoundDuration( sound ) * 100 / pitch ) -- pitch is in percentage
+		if t.pitch then
+			t.pitch = math.Clamp(t.pitch, 0, 255)
+			if t.autolength and t.sound then
+				t.length = ( t.pitch <= 0 ) and -1 or ( SoundDuration( t.sound ) * 100 / t.pitch ) -- pitch is in percentage
 			end
 		end	
 
-		if looping and length and length > 0 then
-			local cvar = GetConVar( "sv_mv_soundemitters_min_loop_length" )
-			local minLength = cvar and cvar:GetFloat() or 0
-			if length < minLength then
-				if ply then ply:ChatPrint("Play length too short: changed from "..length.." to "..math.Round(minLength,2).." second(s).") end
-				length = minLength
+		if t.looping and t.length and t.length > 0 then
+			local minLength = GetConVar( "sv_mv_soundemitters_min_loop_length" ):GetFloat() or 0 -- error if cvar doesn't exist
+			if t.length < minLength then
+				if ply then ply:ChatPrint("Play length too short: changed from "..t.length.." to "..math.Round( minLength, 2 ).." second(s).") end
+				t.length = minLength
 			end
 		end
 
-		local emitterProperties = {
-			sound 		= "Sound",
-			length		= "Length",
-			looping		= "Looping",
-			delay		= "Delay",
-			toggle		= "Toggle",
-			dmgactivate	= "DamageActivate",
-			dmgtoggle	= "DamageToggle",
-			volume		= "Volume",
-			pitch		= "Pitch",
-			key			= "Key",
-			autolength	= "AutoLength",
-			reverse		= "Reverse"
-		}
-
-		local newProperties = { -- Keys used by the duplicator
-			model		= model,
-			sound 		= sound,
-			length		= length,
-			looping		= looping,
-			delay		= delay,
-			toggle		= toggle,
-			dmgactivate	= dmgactivate,
-			dmgtoggle	= dmgtoggle,
-			volume		= volume,
-			pitch		= pitch,
-			key			= key,
-			nocollide 	= nocollide,
-			autolength 	= autolength,
-			reverse 	= reverse
-		}
-
-		for duName, value in pairs( newProperties ) do
+		for duName, value in pairs( t ) do
 			if value ~= nil then
 				local name = emitterProperties[duName]
 				if name then emitter["Set"..name]( emitter, value ) end
@@ -139,31 +128,32 @@ elseif SERVER then
 			end
 		end
 
-		if nocollide then emitter:GetPhysicsObject():EnableCollisions( false ) end
-
-		if reverse then emitter:PreEmit() end
+		if t.nocollide then emitter:GetPhysicsObject():EnableCollisions( false ) end
+		if t.reverse then emitter:PreEmit() end
 
 	end
 
 	
-	local function MakeMVSoundEmitter(  ply, pos, ang, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, nocollide, autolength, reverse  )
+	local function MakeMVSoundEmitter(  ply, pos, ang, ... ) -- look at dupeKeys table for ... args order !
 
 		if not ply:CheckLimit( "mv_soundemitters" ) then return false end
 
-		if not ( model and model ~= "" and util.IsModelLoaded( model ) ) then
+		-- Get the emitter properties
+		local t = ( type( ... ) == "table" ) and ... or toMSEProperties( ... )
+
+		if not ( t.model and util.IsValidModel( t.model ) ) then
 			ply:ChatPrint("Invalid model!")
-			-- ply:EmitSound("buttons/button10.wav")
 			return false
 		end
 
-		local emitter = ents.Create( "mv_soundemitter" )
+		local emitter = ents.Create( "mv_soundemitter" ) or NULL
 		if not emitter:IsValid() then return false end
 
 		emitter:SetPos( pos )
 		emitter:SetAngles( ang )
-		emitter:SetModel( model )
+		emitter:SetModel(t.model) -- useless?
 		emitter:Spawn()
-		updateMSE( emitter, nil, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, ply, nocollide, autolength, reverse )
+		updateMSE( emitter, ply, t )
 
 		ply:AddCount( "mv_soundemitters", emitter )
 		ply:AddCleanup( "mv_soundemitter", emitter )
@@ -173,8 +163,7 @@ elseif SERVER then
 		return emitter
 	end
 
-
-	duplicator.RegisterEntityClass( "mv_soundemitter", MakeMVSoundEmitter, "pos", "ang", "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse" )
+	duplicator.RegisterEntityClass( "mv_soundemitter", MakeMVSoundEmitter, "pos", "ang", unpack(dupeKeys) )
 
 
 	function TOOL:LeftClick( trace, do_weld )
@@ -186,25 +175,29 @@ elseif SERVER then
 		-- If there's no physics object then we can't constraint it.
 		if do_weld and not util.IsValidPhysicsObject( ent, trace.PhysicsBone ) then return false end
 
-		local ply = self:GetOwner() -- attempt to index local 'self' (a nil value) sometimes
+		local ply = self:GetOwner()
 
-		local model			= self:GetClientInfo( "model" )
-		local sound			= self:GetClientInfo( "sound" )
-		local length		= self:GetClientNumber( "length" )
-		local looping		= self:GetClientBool( "looping" )
-		local delay			= self:GetClientNumber( "delay" )
-		local toggle		= self:GetClientInfo( "toggle" )
-		local dmgactivate	= self:GetClientInfo( "dmgactivate" )
-		local dmgtoggle		= self:GetClientInfo( "dmgtoggle" )
-		local volume		= self:GetClientNumber( "volume" )
-		local pitch 		= self:GetClientNumber( "pitch" )
-		local key   		= self:GetClientNumber( "key" )
-		local autolength	= self:GetClientBool( "autolength" )
-		local reverse		= self:GetClientBool( "reverse" )
-		
+		local t = toMSEProperties(
+			self:GetClientInfo("model"),
+			self:GetClientInfo("sound"),
+			self:GetClientNumber("length"),
+			self:GetClientBool("looping"),
+			self:GetClientNumber("delay"),
+			self:GetClientInfo("toggle"),
+			self:GetClientInfo("dmgactivate"),
+			self:GetClientInfo("dmgtoggle"),
+			self:GetClientNumber("volume"),
+			self:GetClientNumber("pitch"),
+			self:GetClientNumber("key"),
+			false, -- nocollide
+			self:GetClientBool("autolength"),
+			self:GetClientBool("reverse")
+		)
+
 		if isMSE( ent ) and ( ent:GetPlayer() == ply ) then
 
-			updateMSE( ent, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, nil, nil, autolength, reverse )
+			t.model = nil
+			updateMSE( ent, nil, t )
 			return true
 
 		end
@@ -213,7 +206,7 @@ elseif SERVER then
 		local ang = trace.HitNormal:Angle()
 		ang.pitch = ang.pitch + 90
 
-		local emitter = MakeMVSoundEmitter( ply, pos, ang, model, sound, length, looping, delay, toggle, dmgactivate, dmgtoggle, volume, pitch, key, false, autolength, reverse )
+		local emitter = MakeMVSoundEmitter( ply, pos, ang, t )
 
 		if not emitter then return false end
 
@@ -221,19 +214,19 @@ elseif SERVER then
 		emitter:SetPos( pos - trace.HitNormal * min.z )
 
 		undo.Create("mv_soundemitter")
-		undo.AddEntity( emitter )
+			undo.AddEntity( emitter )
 
-		if ent and do_weld then
-			local weld = constraint.Weld( ent, emitter, trace.PhysicsBone, 0, 0 )
-			ent:DeleteOnRemove( emitter )
+			if ent and do_weld then
+				local weld = constraint.Weld( ent, emitter, trace.PhysicsBone, 0, 0 )
+				ent:DeleteOnRemove( emitter )
 
-			local physobj = emitter:GetPhysicsObject() 
-			if IsValid( physobj ) then physobj:EnableCollisions( false ) end
-			emitter.nocollide = true
-			undo.AddEntity( weld )
-		end
+				local physobj = emitter:GetPhysicsObject() 
+				if IsValid( physobj ) then physobj:EnableCollisions( false ) end
+				emitter.nocollide = true
+				undo.AddEntity( weld )
+			end
 
-		undo.SetPlayer( ply )
+			undo.SetPlayer( ply )
 		undo.Finish()
 
 		return true
@@ -252,30 +245,20 @@ elseif SERVER then
 		if not ent:IsValid() then return false end
 		
 		local ply = self:GetOwner()
-		if isMSE( ent ) then
-
-			ply:ConCommand(mode.."_model "..tostring(ent:GetModel()))
-			ply:ConCommand(mode.."_sound "..tostring(ent:GetSound()))
-			ply:ConCommand(mode.."_length "..tostring(ent:GetLength()))
-			ply:ConCommand(mode.."_looping "..tostring(ent:GetLooping()))
-			ply:ConCommand(mode.."_delay "..tostring(ent:GetDelay()))
-			ply:ConCommand(mode.."_toggle "..tostring(ent:GetToggle()))
-			ply:ConCommand(mode.."_dmgactivate "..tostring(ent:GetDamageActivate()))
-			ply:ConCommand(mode.."_dmgtoggle "..tostring(ent:GetDamageToggle()))
-			ply:ConCommand(mode.."_volume "..tostring(ent:GetVolume()))
-			ply:ConCommand(mode.."_pitch "..tostring(ent:GetPitch()))
-			ply:ConCommand(mode.."_autolength "..tostring(ent:GetAutoLength()))
-			ply:ConCommand(mode.."_reverse "..tostring(ent:GetReverse()))
-
-			-- Fix for copying original addon sound emitters. Their getter function always return 0...
-			local key = ent:GetKey()
-			if ( not key ) or ( key == 0 and key ~= ent.key ) then key = ent.key end
-			ply:ConCommand(mode.."_key "..tostring(key))
+		local model = ent:GetModel()
+		if model then ply:ConCommand(mode.."_model "..tostring(model)) end
 		
-		elseif ent:GetModel() then
+		if not isMSE( ent ) then return false end
 
-			ply:ConCommand(mode.."_model "..tostring(ent:GetModel()))
-		
+		local conStart = mode.."_"
+		for duName, name in pairs( emitterProperties ) do
+			ply:ConCommand( conStart..duName.." "..tostring( ent["Get" .. name]( ent ) ) )
+		end
+
+		-- Fix for copying original addon sound emitters which always return 0 for key.
+		local key = ent:GetKey()
+		if ( not key ) or ( key == 0 and key ~= ent.key ) then
+			ply:ConCommand(mode.."_key "..tostring( ent.key ))	
 		end
 
 		return true

@@ -16,13 +16,6 @@ f( "models/props_c17/consolebox03a.mdl" )
 f( "models/props_c17/consolebox05a.mdl" )
 f( "models/props_lab/plotter.mdl" )
 f( "models/props_trainstation/payphone_reciever001a.mdl" )
---[[ enable these if you have them
-f( "models/props_italian/gramophone.mdl" )
-f( "MVSoundEmitterModel", "models/jaanus/thruster_megaphn.mdl" )
-f( "MVSoundEmitterModel", "models/jaanus/thruster_shoop.mdl" )
-f( "MVSoundEmitterModel", "models/jaanus/thruster_invisi.mdl" )
-]]
-
 
 local function f( tag, label, sound )
 	if not ( label and sound ) then return end
