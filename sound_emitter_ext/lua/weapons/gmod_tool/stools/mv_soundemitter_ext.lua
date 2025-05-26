@@ -49,7 +49,7 @@ if CLIENT then
 	language.Add( t..".reload", "Copy settings or model." )
 	t = nil
 
-	language.Add( "SBoxLimit_modes", "You've hit the Sound Emitter limit!" )
+	language.Add( "SBoxLimit_mv_soundemitters", "You've hit the Sound Emitter limit!" )
 	language.Add( "mv_soundemitter", "Sound Emitter" )
 	language.Add( "Cleanup_mv_soundemitter", "Sound Emitters" )
 	language.Add( "Cleaned_mv_soundemitter", "Cleaned up all Sound Emitters" )
@@ -102,13 +102,15 @@ elseif SERVER then
 
 		if not isMSE( emitter ) then return end
 
-		if ply and not emitter:GetPlayer():IsPlayer() then emitter:SetPlayer(ply) end
+		if ply and not emitter:GetPlayer():IsPlayer() then
+			emitter:SetPlayer(ply)
+		end
 		ply = emitter:GetPlayer()
 
 		if t.pitch then
 			t.pitch = math.Clamp(t.pitch, 0, 255)
 			if t.autolength and t.sound then
-				t.length = ( t.pitch <= 0 ) and -1 or ( SoundDuration( t.sound ) * 100 / t.pitch ) -- pitch is in percentage
+				t.length = ( t.pitch <= 0 ) and 0 or ( SoundDuration( t.sound ) * 100 / t.pitch ) -- pitch is in percentage
 			end
 		end	
 
@@ -252,7 +254,8 @@ elseif SERVER then
 
 		local conStart = mode.."_"
 		for duName, name in pairs( emitterProperties ) do
-			ply:ConCommand( conStart..duName.." "..tostring( ent["Get" .. name]( ent ) ) )
+			local val = ent["Get" .. name]( ent )
+			if val then ply:ConCommand( conStart..duName.." "..tostring( val ) ) end
 		end
 
 		-- Fix for copying original addon sound emitters which always return 0 for key.

@@ -25,9 +25,6 @@ local function f( tag, label, sound )
 	})
 end
 
-
-f("[SFX]", "FALCOWN... PAUNCH!", "falconpunch.mp3")
-
 local t = "[Music] Portal -"
 f(t, "4000 Degrees Kelvin", "music/portal_4000_degrees_kelvin.mp3")
 f(t, "Android Hell", "music/portal_android_hell.mp3")

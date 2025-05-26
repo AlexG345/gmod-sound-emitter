@@ -1,6 +1,6 @@
 AddCSLuaFile( "cl_init.lua" )
 AddCSLuaFile( "shared.lua" )
-include('shared.lua')
+include( "shared.lua" )
 
 /*---------------------------------------------------------
    Name: Initialize
@@ -11,13 +11,15 @@ function ENT:Initialize()
 	self.Entity:SetSolid( SOLID_VPHYSICS )
 	self.Entity:SetUseType( ONOFF_USE ) -- Unreliable
 	self.soundRF = RecipientFilter()
-	
-	self:SetOn(false)
-
 	local phys = self.Entity:GetPhysicsObject()
 	if phys and phys:IsValid() then phys:Wake() end
 
 end
+
+function ENT:UpdateTransmitState()
+	return TRANSMIT_ALWAYS
+end
+
 
 /*---------------------------------------------------------
    Name: OnTakeDamage
@@ -37,6 +39,7 @@ end
    Name: OnRemove
 ---------------------------------------------------------*/
 function ENT:OnRemove()
+	if not self.SetOn then return end
 	self:StopEmit()
 end
 
@@ -75,7 +78,6 @@ function ENT:PreEmit()
 	if self:GetOn() then self:StopEmit() end
 
 	-- Mostly fixes original addon issue with sound distance
-	-- Looping sounds might not be heard by players who joined while they are looping.
 	if self.soundRF then self.soundRF:AddPAS( self.Entity:GetPos() ) end
 
 	self:SetOn( true )
@@ -96,17 +98,14 @@ function ENT:StopEmit()
 end
 
 function ENT:ToggleSound()
-	if self:GetOn() then
-		self:StopEmit()
-	else
-		self:PreEmit()
-	end
+	if self:GetOn() then self:StopEmit() return end
+	self:PreEmit()
 end
 
 function ENT:ClearTimers()
 	local entindex = self.Entity:EntIndex()
-	timer.Destroy("SoundStart_"..entindex)
-	timer.Destroy("SoundStop_"..entindex)
+	timer.Remove("SoundStart_"..entindex)
+	timer.Remove("SoundStop_"..entindex)
 end
 
 function ENT:Use( activator, caller, useType, value )
@@ -141,6 +140,23 @@ local function Up( pl, ent )
 	if not ent:GetToggle() then ent:StopEmit() end
 
 	return true
+end
+
+function ENT:UpdateNumpadActions( )
+	if self.impulseDown then numpad.Remove( self.impulseDown ) end
+	if self.impulseUp   then numpad.Remove( self.impulseUp	) end
+
+	local key = self:GetKey()
+	if not key then return end
+
+	local ply = self:GetPlayer()
+	if not ply then return end
+
+	local act1, act2 = "mv_soundemitter_Down", "mv_soundemitter_Up"
+	if self:GetReverse() then act1, act2 = act2, act1 end
+
+	self.impulseDown = numpad.OnDown( ply, key, act1, self )
+	self.impulseUp	 = numpad.OnUp(	  ply, key, act2, self )
 end
 
 numpad.Register( "mv_soundemitter_Down", Down )
