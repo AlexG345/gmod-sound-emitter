@@ -43,16 +43,16 @@ if CLIENT then
 	
 	local t = "Tool."..mode
 	language.Add( t..".name", "Sound Emitter (+)" )
-	language.Add( t..".desc", "Create a sound emitter" )
-	language.Add( t..".left", "Create or update a sound emitter" )
-	language.Add( t..".right", "Same as left click but welds the sound emitter." )
+	language.Add( t..".desc", "Create sound emitters" )
+	language.Add( t..".left", "Attach or update a sound emitter" )
+	language.Add( t..".right", "Same as left click but no weld" )
 	language.Add( t..".reload", "Copy settings or model." )
 	t = nil
 
 	language.Add( "SBoxLimit_modes", "You've hit the Sound Emitter limit!" )
-	language.Add( "Undone_mode", "Undone Sound Emitter" )
-	language.Add( "Cleanup_mode", "Sound Emitters" )
-	language.Add( "Cleaned_mode", "Cleaned up all Sound Emitters" )
+	language.Add( "mv_soundemitter", "Sound Emitter" )
+	language.Add( "Cleanup_mv_soundemitter", "Sound Emitters" )
+	language.Add( "Cleaned_mv_soundemitter", "Cleaned up all Sound Emitters" )
 
 	function TOOL:LeftClick( trace )	return not( trace.Entity and trace.Entity:IsPlayer() ) end
 	function TOOL:RightClick( trace )	return self:LeftClick( trace ) end
@@ -276,7 +276,7 @@ function TOOL.BuildCPanel(cpanel)
 	cpanel:ToolPresets( mode, cvarList )
 
 	local panel = cpanel:KeyBinder( "Sound Emitter Key", mode.."_key" )
-		panel:SetToolTip("The keyboard key that sets on or off the sound emitter")
+		panel:SetToolTip("The keyboard key that can set on and off the sound emitter.")
 	
 	cpanel:PropSelect("Preset Models", mode.."_model", list.Get("MVSoundEmitterModel"), 3)
 	cpanel:TextEntry( "Model:", mode.."_model" )
@@ -299,7 +299,26 @@ function TOOL.BuildCPanel(cpanel)
 	cpanel:AddItem( listview )
 
 	local panel = cpanel:TextEntry( "Sound:", mode.."_sound" )
-		panel:SetToolTip( "A in-game sound name. Can be a .wav sound path or a soundscript." )
+		panel:SetToolTip( "A sound from the game content.\nSupports soundscripts, .mp3, .ogg, .wav." )
+
+	local panel1, panel2 = vgui.Create( "DButton", panel ), vgui.Create( "DButton", panel )
+		panel1:SetText("Sound Preview")
+		panel2:SetText("Stop the Sound Preview")
+		panel1:SetImage("icon32/unmuted.png")
+		panel2:SetImage("icon32/muted.png")
+		local ply = LocalPlayer()
+		panel1.DoClick = function()
+			if panel1.soundName then ply:StopSound( panel1.soundName ) end
+			panel1.soundName = GetConVar( mode.."_sound" ):GetString() or ""
+			ply:EmitSound( panel1.soundName )
+		end
+		panel2.DoClick = function()
+			if panel1.soundName then ply:StopSound( panel1.soundName ) end
+		end
+		panel1:Dock(TOP)
+		panel2:DockMargin( 15, 0, 0, 0 )
+		panel2:Dock(TOP)
+		cpanel:AddItem( panel1, panel2 )
 
 	local panel = cpanel:NumSlider( "Volume", mode.."_volume", 0, 1 )
 		panel:SetToolTip( "The loudness of the sound, in proportion of max volume." )
