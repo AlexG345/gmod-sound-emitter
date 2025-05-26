@@ -98,8 +98,11 @@ function ENT:StopEmit()
 end
 
 function ENT:ToggleSound()
-	if self:GetOn() then self:StopEmit() return end
-	self:PreEmit()
+	if self:GetOn() then
+		self:StopEmit()
+	else
+		self:PreEmit()
+	end
 end
 
 function ENT:ClearTimers()

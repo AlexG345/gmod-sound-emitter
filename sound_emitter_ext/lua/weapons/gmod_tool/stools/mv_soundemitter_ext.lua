@@ -102,6 +102,14 @@ elseif SERVER then
 
 		if not isMSE( emitter ) then return end
 
+		-- false might once have been saved as "0"
+		local bool_props = { "looping", "toggle", "dmgactivate", "dmgtoggle", "nocollide", "autolength", "reverse" }
+		for _, prop in ipairs( bool_props ) do
+			if t[prop] == "0" or t[prop] == 0 then
+				t[prop] = false
+			end
+		end
+
 		if ply and not emitter:GetPlayer():IsPlayer() then
 			emitter:SetPlayer(ply)
 		end
@@ -185,9 +193,9 @@ elseif SERVER then
 			self:GetClientNumber("length"),
 			self:GetClientBool("looping"),
 			self:GetClientNumber("delay"),
-			self:GetClientInfo("toggle"),
-			self:GetClientInfo("dmgactivate"),
-			self:GetClientInfo("dmgtoggle"),
+			self:GetClientBool("toggle"),
+			self:GetClientBool("dmgactivate"),
+			self:GetClientBool("dmgtoggle"),
 			self:GetClientNumber("volume"),
 			self:GetClientNumber("pitch"),
 			self:GetClientNumber("key"),
@@ -255,7 +263,7 @@ elseif SERVER then
 		local conStart = mode.."_"
 		for duName, name in pairs( emitterProperties ) do
 			local val = ent["Get" .. name]( ent )
-			if val then ply:ConCommand( conStart..duName.." "..tostring( val ) ) end
+			if val ~= nil then ply:ConCommand( conStart..duName.." "..tostring( val ) ) end
 		end
 
 		-- Fix for copying original addon sound emitters which always return 0 for key.
