@@ -17,7 +17,6 @@ TOOL.ClientConVar[ "volume" ]		= "1"
 TOOL.ClientConVar[ "pitch"  ]		= "100"
 TOOL.ClientConVar[ "reverse" ]		= "0"
 
-
 cleanup.Register( "mv_soundemitter" )
 
 -- Use this if you need more presets?
@@ -72,7 +71,7 @@ elseif SERVER then
 
 	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse" }
 
-	 -- Returns table with keys dupeKeys and values ...
+	 -- Returns a table with keys dupeKeys and values ...
 	local function toMSEProperties( ... )
 		local values = { ... }
 		local t = {}
@@ -82,6 +81,7 @@ elseif SERVER then
 		return t
 	end
 
+	-- Those are the properties you want to use a setter function on when the emitter is created.
 	local emitterProperties = toMSEProperties(
 		"Model",
 		"Sound",
@@ -116,13 +116,15 @@ elseif SERVER then
 		end
 		ply = emitter:GetPlayer()
 
+		-- Limit the pitch and calculate the play length
 		if t.pitch then
 			t.pitch = math.Clamp(t.pitch, 0, 255)
 			if t.autolength and t.sound then
 				t.length = ( t.pitch <= 0 ) and 0 or ( SoundDuration( t.sound ) * 100 / t.pitch ) -- pitch is in percentage
 			end
 		end	
-
+		
+		-- Limit the play length
 		if t.looping and t.length and t.length > 0 then
 			local minLength = GetConVar( "sv_mv_soundemitter_min_loop_length" ):GetFloat() or 0 -- error if cvar doesn't exist
 			if t.length < minLength then
@@ -131,6 +133,7 @@ elseif SERVER then
 			end
 		end
 
+		-- Limit the sound level
 		if t.sound and emitter.SetSoundLevel then
 			local max_sndlvl = GetConVar( "sv_mv_soundemitter_max_sndlvl"):GetFloat() or 0
 			local sndlvl = CreateSound( emitter, t.sound )
@@ -140,7 +143,7 @@ elseif SERVER then
 			end
 			emitter:SetSoundLevel( sndlvl )
 		end
-
+		
 		for duName, value in pairs( t ) do
 			if value ~= nil then
 				local name = emitterProperties[duName]
