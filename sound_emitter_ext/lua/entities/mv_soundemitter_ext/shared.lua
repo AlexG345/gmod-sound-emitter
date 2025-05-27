@@ -26,6 +26,7 @@ function ENT:SetupDataTables()
 	self:NetworkVar( "Float",	2,	"Volume" )
 	self:NetworkVar( "Float",	3,	"Pitch" )
 	self:NetworkVar( "Float",	4,	"Key" )
+	self:NetworkVar( "Float",	5,	"SoundLevel" ) -- not used by duplicator
 
 	local setter = self.SetKey
 	self.SetKey = function( self, key )
@@ -63,6 +64,7 @@ function ENT:SetupDataTables()
 		self:SetVolume( 1 )
 		self:SetPitch( 100 )
 		self:SetKey( 41 )
+		self:SetSoundLevel( 75 )
 	
 	end
 

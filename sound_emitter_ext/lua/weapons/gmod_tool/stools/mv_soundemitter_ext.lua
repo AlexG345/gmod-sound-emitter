@@ -62,7 +62,8 @@ elseif SERVER then
 
 	local cvars =  {
 	sbox_maxmv_soundemitters = 3,
-	sv_mv_soundemitters_min_loop_length = game.SinglePlayer() and 0 or 0.05
+	sv_mv_soundemitter_min_loop_length = game.SinglePlayer() and 0 or 0.05,
+	sv_mv_soundemitter_max_sndlvl = 0
 	}
 	for name, default in pairs( cvars ) do
 		if !ConVarExists( name ) then CreateConVar( name, default ) end
@@ -123,11 +124,21 @@ elseif SERVER then
 		end	
 
 		if t.looping and t.length and t.length > 0 then
-			local minLength = GetConVar( "sv_mv_soundemitters_min_loop_length" ):GetFloat() or 0 -- error if cvar doesn't exist
+			local minLength = GetConVar( "sv_mv_soundemitter_min_loop_length" ):GetFloat() or 0 -- error if cvar doesn't exist
 			if t.length < minLength then
 				if ply then ply:ChatPrint("Play length too short: changed from "..t.length.." to "..math.Round( minLength, 2 ).." second(s).") end
 				t.length = minLength
 			end
+		end
+
+		if t.sound and emitter.SetSoundLevel then
+			local max_sndlvl = GetConVar( "sv_mv_soundemitter_max_sndlvl"):GetFloat() or 0
+			local sndlvl = CreateSound( emitter, t.sound )
+			sndlvl = sndlvl:GetSoundLevel()
+			if max_sndlvl > 0 then
+				sndlvl = (sndlvl <= 0) and max_sndlvl or math.min( sndlvl, max_sndlvl )
+			end
+			emitter:SetSoundLevel( sndlvl )
 		end
 
 		for duName, value in pairs( t ) do
@@ -161,7 +172,7 @@ elseif SERVER then
 
 		emitter:SetPos( pos )
 		emitter:SetAngles( ang )
-		emitter:SetModel(t.model) -- useless?
+		emitter:SetModel(t.model)
 		emitter:Spawn()
 		updateMSE( emitter, ply, t )
 

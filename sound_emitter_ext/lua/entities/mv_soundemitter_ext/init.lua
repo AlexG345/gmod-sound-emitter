@@ -55,6 +55,7 @@ function ENT:StartEmit()
 	-- EmitSound won't let you change the pitch of sound scripts.
 	-- We use CreateSound instead, it picks a random sound from the sound script.
 	self.MySound = CreateSound( self.Entity, self:GetSound() or self.NullSound, self.soundRF )
+	self.MySound:SetSoundLevel( self:GetSoundLevel() )
 	self.MySound:PlayEx( self:GetVolume(), self:GetPitch() )
 	
 	local length = self:GetLength() or 0
