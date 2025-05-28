@@ -1,0 +1,11 @@
+{
+	"title"		:	"Sound Emitter STOOL (ENHANCED)",
+	"type"		:	"tool",
+	"tags"		:	[ "build", "fun" ],
+	"ignore"	:
+	[
+		"*.psd",
+		"*.vcproj",
+		"*.svn*"
+	]
+}
