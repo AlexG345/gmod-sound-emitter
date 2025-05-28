@@ -16,6 +16,7 @@ TOOL.ClientConVar[ "key"    ] 		= "38"
 TOOL.ClientConVar[ "volume" ]		= "1"
 TOOL.ClientConVar[ "pitch"  ]		= "100"
 TOOL.ClientConVar[ "reverse" ]		= "0"
+TOOL.ClientConVar[ "sndlvl_drop" ]	= "0"
 
 cleanup.Register( "mv_soundemitter" )
 
@@ -40,12 +41,18 @@ if CLIENT then
 		{ name = "reload" }
 	}
 	
-	local t = "Tool."..mode
+	local t = "tool."..mode
 	language.Add( t..".name", "Sound Emitter (+)" )
 	language.Add( t..".desc", "Create sound emitters" )
 	language.Add( t..".left", "Attach or update a sound emitter" )
 	language.Add( t..".right", "Same as left click but no weld" )
 	language.Add( t..".reload", "Copy settings or model." )
+	language.Add( t..".dmgactivate", "Activate on Damage" )
+	language.Add( t..".dmgtoggle", "Toggle on Damage" )
+	language.Add( t..".autolength", "Calculate length" )
+	language.Add( t..".length", "Play Length" )
+	language.Add( t..".delay", "Initial Delay" )
+	language.Add( t..".sndlvl_drop", "Attenuation" )
 	t = nil
 
 	language.Add( "SBoxLimit_mv_soundemitters", "You've hit the Sound Emitter limit!" )
@@ -69,7 +76,7 @@ elseif SERVER then
 	end
 	cvars = nil
 
-	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse" }
+	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl_drop" }
 
 	 -- Returns a table with keys dupeKeys and values ...
 	local function toMSEProperties( ... )
@@ -96,7 +103,8 @@ elseif SERVER then
 		"Key",
 		nil,
 		"AutoLength",
-		"Reverse"
+		"Reverse",
+		false
 	)
 
 	local function updateMSE( emitter, ply, t ) -- t = properties table
@@ -133,17 +141,24 @@ elseif SERVER then
 			end
 		end
 
+		-- Sound level drop can't be negative
+		if t.sndlvl_drop then t.sndlvl_drop = math.max(0, t.sndlvl_drop) end
+
 		-- Limit the sound level
 		if t.sound and emitter.SetSoundLevel then
 			local max_sndlvl = GetConVar( "sv_mv_soundemitter_max_sndlvl"):GetFloat() or 0
 			local sndlvl = CreateSound( emitter, t.sound )
 			sndlvl = sndlvl:GetSoundLevel()
+			if sndlvl > 0 then
+				sndlvl = sndlvl - ( t.sndlvl_drop or 0 )
+				if sndlvl <= 0 then sndlvl = 1 end
+			end
 			if max_sndlvl > 0 then
 				sndlvl = (sndlvl <= 0) and max_sndlvl or math.min( sndlvl, max_sndlvl )
 			end
 			emitter:SetSoundLevel( sndlvl )
 		end
-		
+
 		for duName, value in pairs( t ) do
 			if value ~= nil then
 				local name = emitterProperties[duName]
@@ -162,7 +177,7 @@ elseif SERVER then
 
 		if not ply:CheckLimit( "mv_soundemitters" ) then return false end
 
-		-- Get the emitter properties
+		-- Get the emitter properties table
 		local t = ( type( ... ) == "table" ) and ... or toMSEProperties( ... )
 
 		if not ( t.model and util.IsValidModel( t.model ) ) then
@@ -215,7 +230,8 @@ elseif SERVER then
 			self:GetClientNumber("key"),
 			false, -- nocollide
 			self:GetClientBool("autolength"),
-			self:GetClientBool("reverse")
+			self:GetClientBool("reverse"),
+			self:GetClientNumber("sndlvl_drop")
 		)
 
 		if isMSE( ent ) and ( ent:GetPlayer() == ply ) then
@@ -276,8 +292,14 @@ elseif SERVER then
 
 		local conStart = mode.."_"
 		for duName, name in pairs( emitterProperties ) do
-			local val = ent["Get" .. name]( ent )
-			if val ~= nil then ply:ConCommand( conStart..duName.." "..tostring( val ) ) end
+			local getter = name and ent["Get"..name]
+			local val
+			if getter then val = getter( ent ) end
+			if val == nil then val = ent[duName] end -- dupekey fallback
+			if val ~= nil then
+				if type(val) == "number" then val = math.Round(val, 2) end
+				ply:ConCommand( conStart..duName.." "..tostring(val) )
+			end
 		end
 
 		-- Fix for copying original addon sound emitters which always return 0 for key.
@@ -300,6 +322,7 @@ function TOOL.BuildCPanel(cpanel)
 
 	cpanel:ToolPresets( mode, cvarList )
 
+	local t = "#tool."..mode.."."
 	local panel = cpanel:KeyBinder( "Sound Emitter Key", mode.."_key" )
 		panel:SetToolTip("The keyboard key that can set on and off the sound emitter.")
 	
@@ -346,23 +369,28 @@ function TOOL.BuildCPanel(cpanel)
 		cpanel:AddItem( panel1, panel2 )
 
 	local panel = cpanel:NumSlider( "Volume", mode.."_volume", 0, 1 )
-		panel:SetToolTip( "The loudness of the sound, in proportion of max volume." )
+		panel:SetToolTip( "The loudness of the sound, in proportion of max volume.\nThis does not affect the distance at which the sound is heard." )
 
 	local panel = cpanel:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
 		panel:SetToolTip( "The pitch percentage of the sound." )
+
+	local panel = cpanel:NumSlider( t.."sndlvl_drop", mode.."_sndlvl_drop", 0, 180 )
+		panel:SetToolTip( "Reduce the power of the sound, in decibels (dB).\nThis affects the distance at which the sound is heard." )
+		function panel:OnValueChanged( value )
+			if value < 0 then self:SetValue( 0 ) end -- visual
+		end
 	
-	local panel = cpanel:NumSlider( "Initial Delay", mode.."_delay", 0, 100 )
+	local panel = cpanel:NumSlider( t.."delay", mode.."_delay", 0, 100 )
 		panel:SetToolTip( "How many seconds to wait before starting the sound emitter." )
 
-	local panel = cpanel:NumSlider( "Play Length", mode.."_length", 0, 300 )
+	local panel = cpanel:NumSlider( t.."length", mode.."_length", 0, 300 )
 		panel:SetToolTip( "How long before the sound stops or repeats, in seconds.\nSet to 0 or below for infinite duration." )
 
-	local checkbox = cpanel:CheckBox( "Calculate length", mode.."_autolength" )
-		checkbox:SetToolTip( "Set the play length to the approximate length of the sound.\nThis can be inaccurate for self-looping sounds." )
-	
-	function checkbox:OnChange( isChecked )
-		panel:SetEnabled( not isChecked )
-	end
+	local checkbox = cpanel:CheckBox( t.."autolength", mode.."_autolength" )
+		checkbox:SetToolTip( "Set the play length to the approximate length of the sound.\nThis can be inaccurate for self-looping sounds." )	
+		function checkbox:OnChange( isChecked )
+			panel:SetEnabled( not isChecked )
+		end
 
 	local panel = cpanel:CheckBox( "Toggle", mode.."_toggle" )
 		panel:SetToolTip( "Toggle turning the sound emitter on and off." )
@@ -373,11 +401,11 @@ function TOOL.BuildCPanel(cpanel)
 	local panel = cpanel:CheckBox( "Loop", mode.."_looping" )
 		panel:SetToolTip( "Replay the sound after the play length is over.\nFor self-looping sounds it's better to set this off and the play length to -1." )
 
-	local checkbox = cpanel:CheckBox( "Activate on Damage", mode.."_dmgactivate" )
+	local checkbox = cpanel:CheckBox( t.."dmgactivate", mode.."_dmgactivate" )
 		checkbox:SetToolTip( "The emitter will activate if something damages it." )
 
-	local panel = cpanel:CheckBox( "Toggle on Damage", mode.."_dmgtoggle" )
-		panel:SetToolTip( "If something damages the emitter it will toggle but only if 'Activate on Damage' is on." )
+	local panel = cpanel:CheckBox( t.."dmgtoggle", mode.."_dmgtoggle" )
+		panel:SetToolTip( "If something damages the emitter it will toggle but only if '"..checkbox:GetText().."' is on." )
 	
 	function checkbox:OnChange( isChecked )
 		panel:SetEnabled( isChecked )

@@ -7,24 +7,25 @@ ENT.Contact				= ""
 ENT.Purpose				= "To annoy others with your shitty music."
 ENT.Spawnable			= false
 ENT.AdminSpawnable		= false
-ENT.Editable = true
+ENT.Editable			= true
 
 ENT.NullSound = Sound("common/NULL.WAV")
 
 function ENT:SetupDataTables()
 
-	self:NetworkVar( "String",	0,	"Sound" )
- 	self:NetworkVar( "Bool",	0,	"Looping" )
-	self:NetworkVar( "Bool",	1,	"Toggle" )
-	self:NetworkVar( "Bool",	2,	"DamageActivate" )
-	self:NetworkVar( "Bool",	3,	"DamageToggle" )
-	self:NetworkVar( "Bool",	4,	"AutoLength" )
-	self:NetworkVar( "Bool",	5,	"Reverse" )
+	local t = "#tool.mv_soundemitter_ext."
+	self:NetworkVar( "String",	0,	"Sound",			{ KeyName = "sound",		Edit = { type = "String",	order = 0 } } )
+	self:NetworkVar( "Bool",	0,	"Looping",			{ KeyName = "looping",		Edit = { type = "Bool",		order = 7, title = "Loop" } } )
+	self:NetworkVar( "Bool",	1,	"Toggle",			{ KeyName = "toggle",		Edit = { type = "Bool",		order = 5 } } )
+	self:NetworkVar( "Bool",	2,	"DamageActivate",	{ KeyName = "dmgactivate",	Edit = { type = "Bool",		order = 8, title = t.."dmgactivate" } } )
+	self:NetworkVar( "Bool",	3,	"DamageToggle",		{ KeyName = "dmgtoggle",	Edit = { type = "Bool",		order = 9, title = t.."dmgtoggle" } } )
+	self:NetworkVar( "Bool",	4,	"AutoLength",		{ KeyName = "autolength",	Edit = { type = "Bool",		order = 4, title = t.."autolength" } } )
+	self:NetworkVar( "Bool",	5,	"Reverse",			{ KeyName = "reverse",		Edit = { type = "Bool",		order = 6 } } )
 	self:NetworkVar( "Bool",	6,	"On" )
- 	self:NetworkVar( "Float",	0,	"Length"	)
-	self:NetworkVar( "Float",	1,	"Delay" )
-	self:NetworkVar( "Float",	2,	"Volume" )
-	self:NetworkVar( "Float",	3,	"Pitch" )
+ 	self:NetworkVar( "Float",	0,	"Length" )
+	self:NetworkVar( "Float",	1,	"Delay",			{ KeyName = "delay",		Edit = { type = "Float",	order = 3,	min = 0, max = 100, title = t.."delay" } } )
+	self:NetworkVar( "Float",	2,	"Volume",			{ KeyName = "volume",		Edit = { type = "Float",	order = 1,	min = 0, max = 1 } } )
+	self:NetworkVar( "Float",	3,	"Pitch",			{ KeyName = "pitch",		Edit = { type = "Float",	order = 2,	min = 0, max = 255 } } )
 	self:NetworkVar( "Float",	4,	"Key" )
 	self:NetworkVar( "Float",	5,	"SoundLevel" ) -- not used by duplicator
 

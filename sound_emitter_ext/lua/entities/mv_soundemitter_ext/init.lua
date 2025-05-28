@@ -10,11 +10,16 @@ function ENT:Initialize()
 	self.Entity:SetMoveType( MOVETYPE_VPHYSICS )
 	self.Entity:SetSolid( SOLID_VPHYSICS )
 	self.Entity:SetUseType( ONOFF_USE ) -- Unreliable
-	self.soundRF = RecipientFilter()
 	local phys = self.Entity:GetPhysicsObject()
 	if phys and phys:IsValid() then phys:Wake() end
 
+	self.soundRF = RecipientFilter()
+
 end
+
+/*---------------------------------------------------------
+   Name: Network things
+---------------------------------------------------------*/
 
 function ENT:UpdateTransmitState()
 	return TRANSMIT_ALWAYS
@@ -51,9 +56,12 @@ function ENT:StartEmit()
 	
 	if not self then return end
 
-	if self.MySound then self.MySound:Stop() end
-	-- EmitSound won't let you change the pitch of sound scripts.
-	-- We use CreateSound instead, it picks a random sound from the sound script.
+	self:StopMySound()
+	-- I tried many methods (e.g. a pool of csoundpatches) but this is the only one which keeps sound script randomness,
+	-- up-to-date recipient filters (RF) even during looping, and custom pitch/volume.
+	-- https://github.com/Facepunch/garrysmod-issues/issues/5877 exact same problem I think.
+	
+	if self.soundRF then self.soundRF:AddPAS( self.Entity:GetPos() ) end
 	self.MySound = CreateSound( self.Entity, self:GetSound() or self.NullSound, self.soundRF )
 	self.MySound:SetSoundLevel( self:GetSoundLevel() )
 	self.MySound:PlayEx( self:GetVolume(), self:GetPitch() )
@@ -76,10 +84,8 @@ end
 
 
 function ENT:PreEmit()
+	
 	if self:GetOn() then self:StopEmit() end
-
-	-- Mostly fixes original addon issue with sound distance
-	if self.soundRF then self.soundRF:AddPAS( self.Entity:GetPos() ) end
 
 	self:SetOn( true )
 	local delay = self:GetDelay()
@@ -92,10 +98,14 @@ function ENT:PreEmit()
 	end)
 end
 
+function ENT:StopMySound()
+	if self.MySound then self.MySound:Stop() end
+end
+
 function ENT:StopEmit()
 	self:SetOn( false )
 	self:ClearTimers()
-	if self.MySound then self.MySound:Stop() end
+	self:StopMySound()
 end
 
 function ENT:ToggleSound()

@@ -14,5 +14,5 @@ function ENT:Draw()
 end
 
 function ENT:GetOverlayText()
-	return "Sound level: "..(self:GetSoundLevel() or "").."dB\n("..self:GetPlayerName()..")"
+	return "Sound level: "..string.format("%.2f", self:GetSoundLevel() or 0).."dB\n("..self:GetPlayerName()..")"
 end
