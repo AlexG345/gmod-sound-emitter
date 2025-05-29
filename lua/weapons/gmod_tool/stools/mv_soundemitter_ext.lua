@@ -139,7 +139,6 @@ elseif SERVER then
 		-- Check the DSP since some of them play a global sound
 		if t.dsp and GetConVar( "sv_mv_soundemitter_check_dsp" ):GetInt() ~= 0 then
 			local forbidden = { [35] = true, [36] = true, [37] = true, [39] = true }
-			print(forbidden)
 			if forbidden[t.dsp] then
 				ply:ChatPrint("This DSP is forbidden: changed from "..t.dsp.." to 0.")
 				t.dsp = 0
