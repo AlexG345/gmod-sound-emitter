@@ -19,6 +19,7 @@ TOOL.ClientConVar[ "reverse" ]			= "0"
 TOOL.ClientConVar[ "sndlvl" ]			= "75"
 TOOL.ClientConVar[ "dsp" ]				= "0"
 TOOL.ClientConVar[ "usescriptpitch" ] 	= "0"
+TOOL.ClientConVar[ "nostoptoggle" ] 	= "0"
 
 local soundConVar,pitchConVar,dspConVar,volumeConVar
 
@@ -40,9 +41,9 @@ end
 if CLIENT then
 
 	-- lua refresh....
-	soundConVar = GetConVar( mode.."_sound" )
-	pitchConVar = GetConVar( mode.."_pitch" )
-	dspConVar	= GetConVar( mode.."_dsp" )
+	soundConVar 	= GetConVar( mode.."_sound" )
+	pitchConVar 	= GetConVar( mode.."_pitch" )
+	dspConVar		= GetConVar( mode.."_dsp" )
 	volumeConVar	= GetConVar( mode.."_volume" )
 	
 	hook.Add("InitPostEntity","mv_soundemitter_ext_init",function()
@@ -72,7 +73,8 @@ if CLIENT then
 	language.Add( t..".delay", "Initial Delay" )
 	language.Add( t..".sndlvl", "Sound Level" )
 	language.Add( t..".dsp", "Digital Signal Processing" )
-	language.Add( t..".usescriptpitch", "Use Soundscript Pitch" )
+	language.Add( t..".usescriptpitch", "Use Soundscript Pitch instead" )
+	language.Add( t..".nostoptoggle", "Make toggle only restart" )
 	t = nil
 
 	language.Add( "SBoxLimit_mv_soundemitters", "You've hit the Sound Emitter limit!" )
@@ -90,14 +92,14 @@ elseif SERVER then
 	sbox_maxmv_soundemitters = 3,
 	sv_mv_soundemitter_min_loop_length = game.SinglePlayer() and 0 or 0.05,
 	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 100,
-	sv_mv_soundemitter_check_dsp = game.SinglePlayer() and 0 or 1
+	sv_mv_soundemitter_check_dsp = game.SinglePlayer() and 0 or 1 -- should make this into a table somehow to let people add or remove chosen forbidden DSP
 	}
 	for name, default in pairs( cvars ) do
 		if not ConVarExists( name ) then CreateConVar( name, default ) end
 	end
 	cvars = nil
 
-	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch" }
+	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch", "nostoptoggle" }
 
 	 -- Returns a table with keys dupeKeys and values ...
 	local function toMSEProperties( ... )
@@ -127,7 +129,8 @@ elseif SERVER then
 		"Reverse",
 		"SoundLevel",
 		"DSP",
-		"UseScriptPitch"
+		"UseScriptPitch",
+		"NoStopToggle"
 	)
 
 	local function updateMSE( emitter, ply, t ) -- t = properties table
@@ -135,7 +138,7 @@ elseif SERVER then
 		if not isMSE( emitter ) then return end
 
 		-- false might once have been saved as "0"
-		local bool_props = { "looping", "toggle", "dmgactivate", "dmgtoggle", "nocollide", "autolength", "reverse", "usescriptpitch" }
+		local bool_props = { "looping", "toggle", "dmgactivate", "dmgtoggle", "nocollide", "autolength", "reverse", "usescriptpitch", "nostoptoggle" }
 		for _, prop in ipairs( bool_props ) do
 			if t[prop] == "0" or t[prop] == 0 then
 				t[prop] = false
@@ -182,6 +185,7 @@ elseif SERVER then
 				if ply then ply:ChatPrint("Sound level too high: changed from "..t.sndlvl.." to "..math.Round( maxSndLvl, 2 ).." decibel(s).") end
 				t.sndlvl = maxSndLvl
 			end
+			t.sndlvl = math.Clamp( t.sndlvl, 0, 255 ) -- valid range
 		end
 
 		for duName, value in pairs( t ) do
@@ -258,7 +262,8 @@ elseif SERVER then
 			self:GetClientBool("reverse"),
 			self:GetClientNumber("sndlvl"),
 			self:GetClientNumber("dsp"),
-			self:GetClientBool("usescriptpitch")
+			self:GetClientBool("usescriptpitch"),
+			self:GetClientBool("nostoptoggle")
 		)
 
 		if isMSE( ent ) and ( ent:GetPlayer() == ply ) then
@@ -353,10 +358,17 @@ function TOOL.BuildCPanel(cpanel)
 	local ply = LocalPlayer()
 	local panel1, panel2
 
+	local function paint( panel, w, h )
+		local topHeight = panel:GetHeaderHeight()
+		local c = not panel:GetExpanded()
+		draw.RoundedBoxEx(4, 0, 0, w, topHeight, Color(50, 100, 200), true, true, c, c)
+		draw.RoundedBoxEx(8, 0, topHeight, w, h - topHeight + 5, Color(240, 240, 240), false, false, true, true)
+	end
+
 	local panel = cpanel:KeyBinder( "Sound Emitter Key", mode.."_key" )
 		panel:SetToolTip("The keyboard key that can set on and off the sound emitter.")
 	
-	cpanel:PropSelect("Preset Models", mode.."_model", list.Get("MVSoundEmitterModel"), 3)
+	cpanel:PropSelect("Preset Models", mode.."_model", list.Get("MVSoundEmitterModel"), 2)
 	cpanel:TextEntry( "Model:", mode.."_model" )
 
 	local listview = vgui.Create( "DListView" )
@@ -381,16 +393,12 @@ function TOOL.BuildCPanel(cpanel)
 	
 	
 	local dform = vgui.Create( "DForm", panel )
-		
+		cpanel:AddItem( dform )
 		dform:SetLabel( "Sound manipulation" )
 		dform:SetPaintBackground( false )
 		dform:DockPadding( 0, 0, 0, 5 )
-			
 		function dform:Paint(w, h)
-			local topHeight = self:GetHeaderHeight()
-			local c = not self:GetExpanded()
-			draw.RoundedBoxEx(4, 0, 0, w, topHeight, Color(50, 100, 200), true, true, c, c)
-			draw.RoundedBoxEx(8, 0, topHeight, w, h - topHeight + 5, Color(240, 240, 240), false, false, true, true)
+			paint( self, w, h )
 		end
 
 		panel1, panel2 = vgui.Create( "DButton", dform ), vgui.Create( "DButton", dform )
@@ -428,59 +436,96 @@ function TOOL.BuildCPanel(cpanel)
 			end
 			dform:AddItem( panel )
 		end
-		
+
+
+	local dform = vgui.Create( "DForm", panel )
 		cpanel:AddItem( dform )
-
-
-	local panel = cpanel:NumSlider( "Volume", mode.."_volume", 0, 1 )
-		panel:SetToolTip( "The loudness of the sound, in proportion of max volume.\nThis doesn't affect the distance at which the sound is heard." )
-
-	local panel = cpanel:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
-		panel:SetToolTip( "The pitch percentage of the sound." )
-
-	local panel = cpanel:NumSlider( t.."sndlvl", mode.."_sndlvl", 0, 180 )
-		panel:SetToolTip( "The sound's level, in decibels (dB).\nThis affects the distance at which the sound is heard.\nBelow 1 dB sounds play globally." )
-		function panel:OnValueChanged( value )
-			if value < 0 then self:SetValue( 0 ) end -- visual
-			if value ~= 66 then self:SetValue(math.SnapTo(value,5)) end
+		dform:SetLabel( "Sound effects" )
+		dform:SetPaintBackground( false )
+		dform:DockPadding( 0, 0, 0, 5 )
+		dform:SetExpanded( false )
+		function dform:Paint(w, h)
+			paint( self, w, h )
 		end
 
-	local panel = cpanel:CheckBox( t.."usescriptpitch", mode.."_usescriptpitch" )
+		local panel = dform:NumSlider( "Volume", mode.."_volume", 0, 1 )
+			panel:SetToolTip( "The loudness of the sound, in proportion of max volume.\nThis doesn't affect the distance at which the sound is heard." )
+
+		-- Valid sound level values are int 0 to 255 (https://github.com/ValveSoftware/source-sdk-2013/blob/0d8dceea4310fde5706b3ce1c70609d72a38efdf/sp/src/public/soundflags.h#L53)
+		local panel = dform:NumSlider( t.."sndlvl", mode.."_sndlvl", 0, 255, 0 )
+			panel:SetToolTip( "The sound's level, in decibels (dB).\nThis affects the distance at which the sound is heard.\nBelow 1 dB sounds play globally. Very high values can reduce volume." )
+			function panel:OnValueChanged( value )
+				self:SetValue( math.Clamp( value, 0, 255 ) ) -- visual
+				self:SetValue(math.SnapTo(value,1))
+			end
+
+		local panel = dform:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
+			panel:SetToolTip( "The pitch percentage of the sound." )
+
+		local checkbox = dform:CheckBox( t.."usescriptpitch", mode.."_usescriptpitch" )
+			checkbox:SetToolTip( "If the sound is a soundscript, the pitch you set above will be overridden." )
+
+		local panel = dform:NumSlider( t.."dsp", mode.."_dsp", 0, 133, 0 )
+			panel:SetToolTip( "Apply reverb, delay, stereo effect, tone, etc..\nCheck the wiki for more info.\nhttps://wiki.facepunch.com/gmod/DSP_Presets" )
+			dform:ControlHelp( "Leave this at 0 for no sound modification.")
 	
-	local panel = cpanel:NumSlider( t.."delay", mode.."_delay", 0, 100 )
-		panel:SetToolTip( "How many seconds to wait before starting the sound emitter." )
+	local dform = vgui.Create( "DForm", panel )
+		cpanel:AddItem( dform )
+		dform:SetLabel( "Time-related options" )
+		dform:SetPaintBackground( false )
+		dform:DockPadding( 0, 0, 0, 5 )
+		dform:SetExpanded( false )
+		function dform:Paint(w, h)
+			paint( self, w, h )
+		end
 
-	local panel = cpanel:NumSlider( t.."length", mode.."_length", 0, 300 )
-		panel:SetToolTip( "How long before the sound stops or repeats, in seconds.\nSet to 0 or below for infinite duration." )
+		local panel = dform:NumSlider( t.."delay", mode.."_delay", 0, 100 )
+			panel:SetToolTip( "How many seconds to wait before starting the sound emitter." )
 
-	local checkbox = cpanel:CheckBox( t.."autolength", mode.."_autolength" )
-		checkbox:SetToolTip( "Set the play length to the approximate length of the sound.\nThis can be inaccurate for self-looping sounds." )	
+		local panel = dform:NumSlider( t.."length", mode.."_length", 0, 300 )
+			panel:SetToolTip( "How long before the sound stops or repeats, in seconds.\nSet to 0 or below for infinite duration." )
+
+		local checkbox = dform:CheckBox( t.."autolength", mode.."_autolength" )
+			checkbox:SetToolTip( "Set the play length to the approximate length of the sound.\nThis can be inaccurate for self-looping sounds." )	
+			function checkbox:OnChange( isChecked )
+				panel:SetEnabled( not isChecked )
+			end
+
+	local dform = vgui.Create( "DForm", panel )
+		cpanel:AddItem( dform )
+		dform:SetLabel( "Activation options" )
+		dform:SetPaintBackground( false )
+		dform:DockPadding( 0, 0, 0, 5 )
+		dform:SetExpanded( false )
+		function dform:Paint(w, h)
+			paint( self, w, h )
+		end
+
+		local checkbox = dform:CheckBox( "Toggle", mode.."_toggle" )
+			checkbox:SetToolTip( "Toggle turning the sound emitter on and off." )
+
+		local panel = dform:CheckBox( t.."nostoptoggle", mode.."_nostoptoggle" )
+			panel:SetToolTip( "Toggling the sound never stops the sound, instead it restarts it.\nUseful only if '"..checkbox:GetText().."' is on." )
+
 		function checkbox:OnChange( isChecked )
-			panel:SetEnabled( not isChecked )
+			panel:SetEnabled( isChecked )
 		end
 
-	local panel = cpanel:CheckBox( "Toggle", mode.."_toggle" )
-		panel:SetToolTip( "Toggle turning the sound emitter on and off." )
+		local panel = dform:CheckBox( "Reverse", mode.."_reverse" )
+			panel:SetToolTip( "Reverse the activation order." )
+		
+		local panel = dform:CheckBox( "Loop", mode.."_looping" )
+			panel:SetToolTip( "Replay the sound after the play length is over.\nFor self-looping sounds it's better to set this off and the play length to -1." )
 
-	local panel = cpanel:CheckBox( "Reverse", mode.."_reverse" )
-		panel:SetToolTip( "Reverse the activation order." )
-	
-	local panel = cpanel:CheckBox( "Loop", mode.."_looping" )
-		panel:SetToolTip( "Replay the sound after the play length is over.\nFor self-looping sounds it's better to set this off and the play length to -1." )
+		local checkbox = dform:CheckBox( t.."dmgactivate", mode.."_dmgactivate" )
+			checkbox:SetToolTip( "The emitter will activate if something damages it." )
 
-	local checkbox = cpanel:CheckBox( t.."dmgactivate", mode.."_dmgactivate" )
-		checkbox:SetToolTip( "The emitter will activate if something damages it." )
-
-	local panel = cpanel:CheckBox( t.."dmgtoggle", mode.."_dmgtoggle" )
-		panel:SetToolTip( "If something damages the emitter it will toggle but only if '"..checkbox:GetText().."' is on." )
-	
-	function checkbox:OnChange( isChecked )
-		panel:SetEnabled( isChecked )
-	end
-
-	local panel = cpanel:NumSlider( t.."dsp", mode.."_dsp", 0, 133, 0 )
-		panel:SetToolTip( "Apply reverb, delay, stereo effect, tone, etc..\nCheck the wiki for more info.\nhttps://wiki.facepunch.com/gmod/DSP_Presets" )
-		cpanel:ControlHelp( "Leave this at 0 for no sound modification.")
+		local panel = dform:CheckBox( t.."dmgtoggle", mode.."_dmgtoggle" )
+			panel:SetToolTip( "If something damages the emitter it will toggle but only if '"..checkbox:GetText().."' is on." )
+		
+		function checkbox:OnChange( isChecked )
+			panel:SetEnabled( isChecked )
+		end
 
 end
 

@@ -106,7 +106,7 @@ end
 
 
 function ENT:PreEmit()
-	
+
 	if self:GetOn() then self:StopEmit() end
 
 	self:SetOn( true )
@@ -131,7 +131,7 @@ function ENT:StopEmit()
 end
 
 function ENT:ToggleSound()
-	if self:GetOn() then
+	if self:GetOn() and not self:GetNoStopToggle() then
 		self:StopEmit()
 	else
 		self:PreEmit()
