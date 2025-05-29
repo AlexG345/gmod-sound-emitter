@@ -80,7 +80,7 @@ elseif SERVER then
 	local cvars =  {
 	sbox_maxmv_soundemitters = 3,
 	sv_mv_soundemitter_min_loop_length = game.SinglePlayer() and 0 or 0.05,
-	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 90,
+	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 100,
 	sv_mv_soundemitter_check_dsp = game.SinglePlayer() and 0 or 1
 	}
 	for name, default in pairs( cvars ) do
@@ -164,7 +164,7 @@ elseif SERVER then
 
 		-- Limit the sound level.
 		if t.sndlvl then
-			local maxSndLvl = GetConVar( "sv_mv_soundemitter_max_sndlvl"):GetFloat() or 90
+			local maxSndLvl = GetConVar( "sv_mv_soundemitter_max_sndlvl"):GetFloat() or 100
 			-- If global sounds are allowed there's no need to limit the sound level
 			-- Sound levels <= 1 play at infinite distances.
 			if maxSndLvl > 0 and ( t.sndlvl <= 1 or t.sndlvl > maxSndLvl ) then
