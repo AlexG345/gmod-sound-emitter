@@ -37,12 +37,11 @@ end
 if CLIENT then
 	
 	hook.Add("InitPostEntity","mv_soundemitter_ext_init",function()
-
 		-- store convars for sound preview in the menu
-		soundConVar = GetConVar( mode.."_sound" )
-		pitchConVar = GetConVar( mode.."_pitch" )
-		dspConVar	= GetConVar( mode.."_dsp" )
-
+		soundConVar 	= GetConVar( mode.."_sound" )
+		pitchConVar 	= GetConVar( mode.."_pitch" )
+		dspConVar		= GetConVar( mode.."_dsp" )
+		volumeConVar	= GetConVar( mode.."_volume" )
 	end)
 
 	TOOL.Information = {
@@ -139,7 +138,9 @@ elseif SERVER then
 
 		-- Check the DSP since some of them play a global sound
 		if t.dsp and GetConVar( "sv_mv_soundemitter_check_dsp" ):GetInt() ~= 0 then
-			if ( t.dsp == 35 or t.dsp == 39 ) then
+			local forbidden = { [35] = true, [36] = true, [37] = true, [39] = true }
+			print(forbidden)
+			if forbidden[t.dsp] then
 				ply:ChatPrint("This DSP is forbidden: changed from "..t.dsp.." to 0.")
 				t.dsp = 0
 			end
@@ -383,20 +384,26 @@ function TOOL.BuildCPanel(cpanel)
 
 		panel1, panel2 = vgui.Create( "DButton", dform ), vgui.Create( "DButton", dform )
 			panel1:SetText( "Sound Preview" )
-			panel2:SetText( "Stop the Sound Preview" )
 			panel1:SetImage( "icon32/unmuted.png" )
-			panel2:SetImage( "icon32/muted.png" )
-			panel1.DoClick = function()
-				if panel1.soundName then ply:StopSound( panel1.soundName ) end
-				panel1.soundName = soundConVar:GetString() or ""
-				ply:EmitSound( panel1.soundName, 75, pitchConVar:GetFloat(), 1, CHAN_STATIC, 0, dspConVar:GetInt() )
-			end
-			panel2.DoClick = function()
-				if panel1.soundName then ply:StopSound( panel1.soundName ) end
-			end
+			panel1:SetToolTip( "Does not take looping and play length into account." )
 			panel1:Dock( TOP )
+			panel1.DoClick = function()
+				if panel1.mySound then panel1.mySound:Stop() end
+				local snd = CreateSound( ply, soundConVar:GetString() or "" )
+				snd:SetDSP( dspConVar:GetInt() or 0 )
+				snd:PlayEx( volumeConVar:GetFloat() or 1, pitchConVar:GetFloat() or 100 )
+				panel1.mySound = snd
+			end
+			panel2:SetText( "Stop the Sound Preview" )
+			panel2:SetImage( "icon32/muted.png" )
 			panel2:DockMargin( 15, 0, 0, 0 )
 			panel2:Dock( TOP )
+			panel2.DoClick = function()
+				if panel1.mySound then
+					panel1.mySound:Stop()
+					panel1.mySound = nil
+				end
+			end
 			dform:AddItem( panel1, panel2 )
 		
 		-- Helper button for stream radios
