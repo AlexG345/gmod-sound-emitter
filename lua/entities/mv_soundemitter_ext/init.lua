@@ -6,13 +6,13 @@ include( "shared.lua" )
    Name: Initialize
 ---------------------------------------------------------]]
 function ENT:Initialize()
-	self.Entity:PhysicsInit( SOLID_VPHYSICS )
-	self.Entity:SetMoveType( MOVETYPE_VPHYSICS )
-	self.Entity:SetSolid( SOLID_VPHYSICS )
-	self.Entity:SetUseType( ONOFF_USE ) -- Unreliable
+	self:PhysicsInit( SOLID_VPHYSICS )
+	self:SetMoveType( MOVETYPE_VPHYSICS )
+	self:SetSolid( SOLID_VPHYSICS )
+	self:SetUseType( ONOFF_USE ) -- Unreliable
 	self.soundRF = RecipientFilter()
 	
-	local phys = self.Entity:GetPhysicsObject()
+	local phys = self:GetPhysicsObject()
 	if phys and phys:IsValid() then phys:Wake() end
 
 end
@@ -30,7 +30,7 @@ end
    Name: OnTakeDamage
 ---------------------------------------------------------]]
 function ENT:OnTakeDamage( dmginfo )
-	self.Entity:TakePhysicsDamage( dmginfo )
+	self:TakePhysicsDamage( dmginfo )
 	if self:GetDamageActivate() then
 		if self:GetDamageToggle() then
 			self:ToggleSound()
@@ -61,16 +61,37 @@ function ENT:StartEmit()
 	-- up-to-date recipient filters (RF) even during looping, and custom pitch/volume.
 	-- https://github.com/Facepunch/garrysmod-issues/issues/5877 exact same problem I think.
 	
-	if self.soundRF then self.soundRF:AddPAS( self.Entity:GetPos() ) end
-	self.MySound = CreateSound( self.Entity, self:GetSound() or self.NullSound, self.soundRF )
+	if self.soundRF then self.soundRF:AddPAS( self:GetPos() ) end
+
+	local snd = self:GetSound()
+	local sndscript
+	local pitch = self:GetPitch()
+
+	if snd and sound.GetProperties( snd ) then
+		sndscript = sound.GetProperties( snd )
+		if istable(sndscript.sound) then 
+			snd = sndscript.sound[math.random( #sndscript.sound )]--table.Random( sndscript.sound )
+		else
+			snd = sndscript.sound
+		end
+
+		if self:GetUseScriptPitch() then
+			pitch = sndscript.pitch
+			if istable( pitch ) then
+				pitch = math.random( pitch[1] or pitch.pitchstart, pitch[2] or pitch.pitchend )
+			end
+		end
+	end
+
+	self.MySound = CreateSound( self, snd or self.NullSound, self.soundRF )
 	self.MySound:SetSoundLevel( self:GetSoundLevel() )
 	self.MySound:SetDSP( self:GetDSP() )
-	self.MySound:PlayEx( self:GetVolume(), self:GetPitch() )
+	self.MySound:PlayEx( self:GetVolume(), pitch )
 	
 	local length = self:GetLength() or 0
 	if length <= 0 then return end
 
-	local entindex = self.Entity:EntIndex()
+	local entindex = self:EntIndex()
 	local emitter = self
 	if self:GetLooping() then
 		timer.Create("SoundStart_"..entindex, length, 1, function()
@@ -92,7 +113,7 @@ function ENT:PreEmit()
 	local delay = self:GetDelay()
 	if delay <= 0 then self:StartEmit() return end
 
-	local entindex = self.Entity:EntIndex()
+	local entindex = self:EntIndex()
 	local emitter = self
 	timer.Create("SoundStart_"..entindex, delay, 1, function()
 		emitter:StartEmit()
@@ -118,7 +139,7 @@ function ENT:ToggleSound()
 end
 
 function ENT:ClearTimers()
-	local entindex = self.Entity:EntIndex()
+	local entindex = self:EntIndex()
 	timer.Remove("SoundStart_"..entindex)
 	timer.Remove("SoundStop_"..entindex)
 end

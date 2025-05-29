@@ -6,7 +6,6 @@
 	[
 		"*.psd",
 		"*.vcproj",
-		"*.svn*",
 		"README.md",
 		"LICENSE",
 		"*.git"

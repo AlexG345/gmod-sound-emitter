@@ -3,21 +3,24 @@ local mode = TOOL.Mode
 TOOL.Category		= "Construction"
 TOOL.Name			= "#Tool."..mode..".name"
 
-TOOL.ClientConVar[ "model" ]		= "models/props_lab/citizenradio.mdl"
-TOOL.ClientConVar[ "sound" ] 		= "coast.siren_citizen"
-TOOL.ClientConVar[ "length" ]		= "0"
-TOOL.ClientConVar[ "autolength"  ]	= "0"
-TOOL.ClientConVar[ "looping" ]		= "0"
-TOOL.ClientConVar[ "delay" ]		= "0"
-TOOL.ClientConVar[ "toggle" ]		= "0"
-TOOL.ClientConVar[ "dmgactivate" ] 	= "0"
-TOOL.ClientConVar[ "dmgtoggle" ] 	= "0"
-TOOL.ClientConVar[ "key"    ] 		= "38"
-TOOL.ClientConVar[ "volume" ]		= "1"
-TOOL.ClientConVar[ "pitch"  ]		= "100"
-TOOL.ClientConVar[ "reverse" ]		= "0"
-TOOL.ClientConVar[ "sndlvl" ]		= "75"
-TOOL.ClientConVar[ "dsp" ]			= "0"
+TOOL.ClientConVar[ "model" ]			= "models/props_lab/citizenradio.mdl"
+TOOL.ClientConVar[ "sound" ] 			= "coast.siren_citizen"
+TOOL.ClientConVar[ "length" ]			= "0"
+TOOL.ClientConVar[ "autolength"  ]		= "0"
+TOOL.ClientConVar[ "looping" ]			= "0"
+TOOL.ClientConVar[ "delay" ]			= "0"
+TOOL.ClientConVar[ "toggle" ]			= "0"
+TOOL.ClientConVar[ "dmgactivate" ] 		= "0"
+TOOL.ClientConVar[ "dmgtoggle" ] 		= "0"
+TOOL.ClientConVar[ "key"    ] 			= "38"
+TOOL.ClientConVar[ "volume" ]			= "1"
+TOOL.ClientConVar[ "pitch"  ]			= "100"
+TOOL.ClientConVar[ "reverse" ]			= "0"
+TOOL.ClientConVar[ "sndlvl" ]			= "75"
+TOOL.ClientConVar[ "dsp" ]				= "0"
+TOOL.ClientConVar[ "usescriptpitch" ] 	= "0"
+
+local soundConVar,pitchConVar,dspConVar,volumeConVar
 
 cleanup.Register( "mv_soundemitter" )
 
@@ -35,6 +38,12 @@ local function isMSE( ent )
 end
 
 if CLIENT then
+
+	-- lua refresh....
+	soundConVar = GetConVar( mode.."_sound" )
+	pitchConVar = GetConVar( mode.."_pitch" )
+	dspConVar	= GetConVar( mode.."_dsp" )
+	volumeConVar	= GetConVar( mode.."_volume" )
 	
 	hook.Add("InitPostEntity","mv_soundemitter_ext_init",function()
 		-- store convars for sound preview in the menu
@@ -63,6 +72,7 @@ if CLIENT then
 	language.Add( t..".delay", "Initial Delay" )
 	language.Add( t..".sndlvl", "Sound Level" )
 	language.Add( t..".dsp", "Digital Signal Processing" )
+	language.Add( t..".usescriptpitch", "Use Soundscript Pitch" )
 	t = nil
 
 	language.Add( "SBoxLimit_mv_soundemitters", "You've hit the Sound Emitter limit!" )
@@ -87,7 +97,7 @@ elseif SERVER then
 	end
 	cvars = nil
 
-	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp" }
+	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch" }
 
 	 -- Returns a table with keys dupeKeys and values ...
 	local function toMSEProperties( ... )
@@ -116,7 +126,8 @@ elseif SERVER then
 		"AutoLength",
 		"Reverse",
 		"SoundLevel",
-		"DSP"
+		"DSP",
+		"UseScriptPitch"
 	)
 
 	local function updateMSE( emitter, ply, t ) -- t = properties table
@@ -124,7 +135,7 @@ elseif SERVER then
 		if not isMSE( emitter ) then return end
 
 		-- false might once have been saved as "0"
-		local bool_props = { "looping", "toggle", "dmgactivate", "dmgtoggle", "nocollide", "autolength", "reverse" }
+		local bool_props = { "looping", "toggle", "dmgactivate", "dmgtoggle", "nocollide", "autolength", "reverse", "usescriptpitch" }
 		for _, prop in ipairs( bool_props ) do
 			if t[prop] == "0" or t[prop] == 0 then
 				t[prop] = false
@@ -246,7 +257,8 @@ elseif SERVER then
 			self:GetClientBool("autolength"),
 			self:GetClientBool("reverse"),
 			self:GetClientNumber("sndlvl"),
-			self:GetClientNumber("dsp")
+			self:GetClientNumber("dsp"),
+			self:GetClientBool("usescriptpitch")
 		)
 
 		if isMSE( ent ) and ( ent:GetPlayer() == ply ) then
@@ -430,7 +442,10 @@ function TOOL.BuildCPanel(cpanel)
 		panel:SetToolTip( "The sound's level, in decibels (dB).\nThis affects the distance at which the sound is heard.\nBelow 1 dB sounds play globally." )
 		function panel:OnValueChanged( value )
 			if value < 0 then self:SetValue( 0 ) end -- visual
+			if value ~= 66 then self:SetValue(math.SnapTo(value,5)) end
 		end
+
+	local panel = cpanel:CheckBox( t.."usescriptpitch", mode.."_usescriptpitch" )
 	
 	local panel = cpanel:NumSlider( t.."delay", mode.."_delay", 0, 100 )
 		panel:SetToolTip( "How many seconds to wait before starting the sound emitter." )
@@ -464,7 +479,7 @@ function TOOL.BuildCPanel(cpanel)
 	end
 
 	local panel = cpanel:NumSlider( t.."dsp", mode.."_dsp", 0, 133, 0 )
-		panel:SetToolTip( "Apply reverb, delay, stereo effect, tone, etc..\nCheck the wiki for more info." )
+		panel:SetToolTip( "Apply reverb, delay, stereo effect, tone, etc..\nCheck the wiki for more info.\nhttps://wiki.facepunch.com/gmod/DSP_Presets" )
 		cpanel:ControlHelp( "Leave this at 0 for no sound modification.")
 
 end
