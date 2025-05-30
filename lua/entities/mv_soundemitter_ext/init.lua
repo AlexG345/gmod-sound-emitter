@@ -70,7 +70,7 @@ function ENT:StartEmit()
 	if snd and sound.GetProperties( snd ) then
 		sndscript = sound.GetProperties( snd )
 		if istable(sndscript.sound) then 
-			snd = sndscript.sound[math.random( #sndscript.sound )]--table.Random( sndscript.sound )
+			snd = sndscript.sound[math.random( #sndscript.sound )]--more efficient than table.Random( sndscript.sound )
 		else
 			snd = sndscript.sound
 		end
@@ -88,16 +88,23 @@ function ENT:StartEmit()
 	self.MySound:SetDSP( self:GetDSP() )
 	self.MySound:PlayEx( self:GetVolume(), pitch )
 	
-	local length = self:GetLength() or 0
-	if length <= 0 then return end
-
+	-- We can calculate the duration here since we've finally picked an exact sound
+	-- Maybe we should save length per sound in a table instead of recalculating each time...
+	local length = self:GetAutoLength() and MSECalculateDuration( snd, pitch ) or self:GetLength() or 0
+	local loopLength = self:GetSameLength() and length or self:GetLoopLength() or 0
 	local entindex = self:EntIndex()
 	local emitter = self
-	if self:GetLooping() then
-		timer.Create("SoundStart_"..entindex, length, 1, function()
+
+	if loopLength > 0 then
+		if length > 0 and length < loopLength then
+			timer.Create("SoundStop_"..entindex, length, 1, function()
+				emitter:StopMySound() -- but stay enabled
+			end)
+		end
+		timer.Create("SoundStart_"..entindex, loopLength, 1, function()
 			emitter:StartEmit()
 		end)
-	else
+	elseif length > 0 then 
 		timer.Create("SoundStop_"..entindex, length, 1, function()
 			emitter:StopEmit()
 		end)

@@ -7,7 +7,7 @@ TOOL.ClientConVar[ "model" ]			= "models/props_lab/citizenradio.mdl"
 TOOL.ClientConVar[ "sound" ] 			= "coast.siren_citizen"
 TOOL.ClientConVar[ "length" ]			= "0"
 TOOL.ClientConVar[ "autolength"  ]		= "0"
-TOOL.ClientConVar[ "looping" ]			= "0"
+TOOL.ClientConVar[ "looplength" ]		= "0"
 TOOL.ClientConVar[ "delay" ]			= "0"
 TOOL.ClientConVar[ "toggle" ]			= "0"
 TOOL.ClientConVar[ "dmgactivate" ] 		= "0"
@@ -20,6 +20,7 @@ TOOL.ClientConVar[ "sndlvl" ]			= "75"
 TOOL.ClientConVar[ "dsp" ]				= "0"
 TOOL.ClientConVar[ "usescriptpitch" ] 	= "0"
 TOOL.ClientConVar[ "nostoptoggle" ] 	= "0"
+TOOL.ClientConVar[ "samelength" ] 		= "1"
 
 local soundConVar,pitchConVar,dspConVar,volumeConVar
 
@@ -40,18 +41,18 @@ end
 
 if CLIENT then
 
+	local function refreshConVar()
+		soundConVar 	 = GetConVar( mode.."_sound" )
+		volumeConVar	 = GetConVar( mode.."_volume" )
+		pitchConVar 	 = GetConVar( mode.."_pitch" )
+		dspConVar		 = GetConVar( mode.."_dsp" )
+	end
 	-- lua refresh....
-	soundConVar 	= GetConVar( mode.."_sound" )
-	pitchConVar 	= GetConVar( mode.."_pitch" )
-	dspConVar		= GetConVar( mode.."_dsp" )
-	volumeConVar	= GetConVar( mode.."_volume" )
+	refreshConVar()
 	
 	hook.Add("InitPostEntity","mv_soundemitter_ext_init",function()
 		-- store convars for sound preview in the menu
-		soundConVar 	= GetConVar( mode.."_sound" )
-		pitchConVar 	= GetConVar( mode.."_pitch" )
-		dspConVar		= GetConVar( mode.."_dsp" )
-		volumeConVar	= GetConVar( mode.."_volume" )
+		refreshConVar()
 	end)
 
 	TOOL.Information = {
@@ -65,7 +66,7 @@ if CLIENT then
 	language.Add( t..".desc", "Create sound emitters" )
 	language.Add( t..".left", "Attach or update a sound emitter" )
 	language.Add( t..".right", "Same as left click but no weld" )
-	language.Add( t..".reload", "Copy settings or model." )
+	language.Add( t..".reload", "Copy settings or model" )
 	language.Add( t..".dmgactivate", "Activate on Damage" )
 	language.Add( t..".dmgtoggle", "Toggle on Damage" )
 	language.Add( t..".autolength", "Calculate length" )
@@ -73,8 +74,10 @@ if CLIENT then
 	language.Add( t..".delay", "Initial Delay" )
 	language.Add( t..".sndlvl", "Sound Level" )
 	language.Add( t..".dsp", "Digital Signal Processing" )
-	language.Add( t..".usescriptpitch", "Use Soundscript Pitch instead" )
-	language.Add( t..".nostoptoggle", "Make toggle only restart" )
+	language.Add( t..".usescriptpitch", "Use Soundscript Pitch" )
+	language.Add( t..".nostoptoggle", "Toggle always plays" )
+	language.Add( t..".looplength", "Loop Length" )
+	language.Add( t..".samelength", "Use play length as loop length" )
 	t = nil
 
 	language.Add( "SBoxLimit_mv_soundemitters", "You've hit the Sound Emitter limit!" )
@@ -90,7 +93,7 @@ elseif SERVER then
 
 	local cvars =  {
 	sbox_maxmv_soundemitters = 3,
-	sv_mv_soundemitter_min_loop_length = game.SinglePlayer() and 0 or 0.05,
+	sv_mv_soundemitter_min_looplength = game.SinglePlayer() and 0 or 0.15,
 	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 100,
 	sv_mv_soundemitter_check_dsp = game.SinglePlayer() and 0 or 1 -- should make this into a table somehow to let people add or remove chosen forbidden DSP
 	}
@@ -99,7 +102,7 @@ elseif SERVER then
 	end
 	cvars = nil
 
-	local dupeKeys = { "model", "sound", "length", "looping", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch", "nostoptoggle" }
+	local dupeKeys = { "model", "sound", "length", "looplength", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch", "nostoptoggle", "samelength" }
 
 	 -- Returns a table with keys dupeKeys and values ...
 	local function toMSEProperties( ... )
@@ -116,7 +119,7 @@ elseif SERVER then
 		"Model",
 		"Sound",
 		"Length",
-		"Looping",
+		"LoopLength",
 		"Delay",
 		"Toggle",
 		"DamageActivate",
@@ -130,7 +133,8 @@ elseif SERVER then
 		"SoundLevel",
 		"DSP",
 		"UseScriptPitch",
-		"NoStopToggle"
+		"NoStopToggle",
+		"SameLength"
 	)
 
 	local function updateMSE( emitter, ply, t ) -- t = properties table
@@ -138,7 +142,7 @@ elseif SERVER then
 		if not isMSE( emitter ) then return end
 
 		-- false might once have been saved as "0"
-		local bool_props = { "looping", "toggle", "dmgactivate", "dmgtoggle", "nocollide", "autolength", "reverse", "usescriptpitch", "nostoptoggle" }
+		local bool_props = { "toggle", "dmgactivate", "dmgtoggle", "nocollide", "autolength", "reverse", "usescriptpitch", "nostoptoggle", "samelength" }
 		for _, prop in ipairs( bool_props ) do
 			if t[prop] == "0" or t[prop] == 0 then
 				t[prop] = false
@@ -154,25 +158,20 @@ elseif SERVER then
 		if t.dsp and GetConVar( "sv_mv_soundemitter_check_dsp" ):GetInt() ~= 0 then
 			local forbidden = { [35] = true, [36] = true, [37] = true, [39] = true }
 			if forbidden[t.dsp] then
-				ply:ChatPrint("This DSP is forbidden: changed from "..t.dsp.." to 0.")
+				ply:ChatPrint("This DSP is forbidden! Changed from "..t.dsp.." to 0.")
 				t.dsp = 0
 			end
 		end
 
-		-- Limit the pitch and calculate the play length
-		if t.pitch then
-			t.pitch = math.Clamp(t.pitch, 0, 255)
-			if t.autolength and t.sound then
-				t.length = ( t.pitch <= 0 ) and 0 or ( SoundDuration( t.sound ) * 100 / t.pitch ) -- pitch is in percentage
-			end
-		end	
+		-- Limit the pitch
+		if t.pitch then t.pitch = math.Clamp(t.pitch, 0, 255) end	
 		
 		-- Limit the play length
-		if t.looping and t.length and t.length > 0 then
-			local minLength = GetConVar( "sv_mv_soundemitter_min_loop_length" ):GetFloat() or 0 -- error if cvar doesn't exist
-			if t.length < minLength then
-				if ply then ply:ChatPrint("Play length too short: changed from "..t.length.." to "..math.Round( minLength, 2 ).." second(s).") end
-				t.length = minLength
+		if t.looplength and t.looplength > 0 then
+			local minLoopLength = GetConVar( "sv_mv_soundemitter_min_looplength" ):GetFloat() or 0 -- error if cvar doesn't exist
+			if t.looplength < minLoopLength then
+				if ply then ply:ChatPrint("Loop length too short! Changed from "..t.looplength.." to "..math.Round( minLoopLength, 2 ).." second(s).") end
+				t.looplength = minLoopLength
 			end
 		end
 
@@ -182,7 +181,7 @@ elseif SERVER then
 			-- If global sounds are allowed there's no need to limit the sound level
 			-- Sound levels <= 1 play at infinite distances.
 			if maxSndLvl > 0 and ( t.sndlvl <= 1 or t.sndlvl > maxSndLvl ) then
-				if ply then ply:ChatPrint("Sound level too high: changed from "..t.sndlvl.." to "..math.Round( maxSndLvl, 2 ).." decibel(s).") end
+				if ply then ply:ChatPrint("Sound level too high! Changed from "..t.sndlvl.." to "..math.Round( maxSndLvl, 2 ).." decibel(s).") end
 				t.sndlvl = maxSndLvl
 			end
 			t.sndlvl = math.Clamp( t.sndlvl, 0, 255 ) -- valid range
@@ -249,7 +248,7 @@ elseif SERVER then
 			self:GetClientInfo("model"),
 			self:GetClientInfo("sound"),
 			self:GetClientNumber("length"),
-			self:GetClientBool("looping"),
+			self:GetClientNumber("looplength"),
 			self:GetClientNumber("delay"),
 			self:GetClientBool("toggle"),
 			self:GetClientBool("dmgactivate"),
@@ -263,7 +262,8 @@ elseif SERVER then
 			self:GetClientNumber("sndlvl"),
 			self:GetClientNumber("dsp"),
 			self:GetClientBool("usescriptpitch"),
-			self:GetClientBool("nostoptoggle")
+			self:GetClientBool("nostoptoggle"),
+			self:GetClientBool("samelength")
 		)
 
 		if isMSE( ent ) and ( ent:GetPlayer() == ply ) then
@@ -356,7 +356,16 @@ function TOOL.BuildCPanel(cpanel)
 
 	local t = "#tool."..mode.."."
 	local ply = LocalPlayer()
-	local panel1, panel2
+	local panel1, panel2, pitchSlider, lengthSlider
+
+	cvars.AddChangeCallback( mode.."_sound", function(convar_name, value_old, value_new)
+		pitchSlider:updatePitch()
+		lengthSlider:updateLength()
+	end)
+
+	cvars.AddChangeCallback( mode.."_pitch", function(convar_name, value_old, value_new)
+		lengthSlider:updateLength()
+	end)
 
 	local function paint( panel, w, h )
 		local topHeight = panel:GetHeaderHeight()
@@ -365,43 +374,43 @@ function TOOL.BuildCPanel(cpanel)
 		draw.RoundedBoxEx(8, 0, topHeight, w, h - topHeight + 5, Color(240, 240, 240), false, false, true, true)
 	end
 
-	local panel = cpanel:KeyBinder( "Sound Emitter Key", mode.."_key" )
-		panel:SetToolTip("The keyboard key that can set on and off the sound emitter.")
+	local keyBinder = cpanel:KeyBinder( "Sound Emitter Key", mode.."_key" )
+		keyBinder:SetToolTip("The keyboard key that can set on and off the sound emitter.")
 	
 	cpanel:PropSelect("Preset Models", mode.."_model", list.Get("MVSoundEmitterModel"), 2)
 	cpanel:TextEntry( "Model:", mode.."_model" )
 
-	local listview = vgui.Create( "DListView" )
-		listview:SetSize( 80,200 )
-		listview:SetMultiSelect( false )
-		listview:AddColumn( "Preset Sounds" )
+	local listView = vgui.Create( "DListView" )
+		listView:SetSize( 80,200 )
+		listView:SetMultiSelect( false )
+		listView:AddColumn( "Preset Sounds" )
 		for soundName, _ in pairs(list.Get("MVSoundEmitterExtSound")) do
-			listview:AddLine( soundName )
+			listView:AddLine( soundName )
 		end
-		listview:SortByColumn( 1 )
-
+		listView:SortByColumn( 1 )
 		local command = "mv_soundemitter_ext_sound"
-		listview.OnRowSelected = function( panel, rowIndex, row )
+		function listView:OnRowSelected( rowIndex, row )
 			-- Get the soundname at this cell
-			local parameter = list.Get("MVSoundEmitterExtSound")[row:GetValue( 1 )][ command ]
-			if parameter then ply:ConCommand( command.." "..parameter ) end
+			local snd = list.Get("MVSoundEmitterExtSound")[row:GetValue( 1 )][ command ]
+			if not snd then return end
+			ply:ConCommand( command.." "..snd )
 		end
-	cpanel:AddItem( listview )
+		cpanel:AddItem( listView )
 
 	local panel = cpanel:TextEntry( "Sound:", mode.."_sound" )
 		panel:SetToolTip( "A sound from the game content.\nSupports soundscripts, .mp3, .ogg, .wav." )
 	
 	
-	local dform = vgui.Create( "DForm", panel )
-		cpanel:AddItem( dform )
-		dform:SetLabel( "Sound manipulation" )
-		dform:SetPaintBackground( false )
-		dform:DockPadding( 0, 0, 0, 5 )
-		function dform:Paint(w, h)
+	local dForm = vgui.Create( "DForm", panel )
+		cpanel:AddItem( dForm )
+		dForm:SetLabel( "Sound manipulation" )
+		dForm:SetPaintBackground( false )
+		dForm:DockPadding( 0, 0, 0, 5 )
+		function dForm:Paint(w, h)
 			paint( self, w, h )
 		end
 
-		panel1, panel2 = vgui.Create( "DButton", dform ), vgui.Create( "DButton", dform )
+		panel1, panel2 = vgui.Create( "DButton", dForm ), vgui.Create( "DButton", dForm )
 			panel1:SetText( "Sound Preview" )
 			panel1:SetImage( "icon32/unmuted.png" )
 			panel1:SetToolTip( "Does not take looping and play length into account." )
@@ -423,104 +432,149 @@ function TOOL.BuildCPanel(cpanel)
 					panel1.mySound = nil
 				end
 			end
-			dform:AddItem( panel1, panel2 )
+			dForm:AddItem( panel1, panel2 )
 		
 		-- Helper button for stream radios
 		if scripted_ents.Get( "base_streamradio" ) then
-			local panel = vgui.Create( "DButton", dform )
+			local panel = vgui.Create( "DButton", dForm )
 			panel:SetText( "Send to Stream Radio" )
 			panel:SetImage( "icon16/phone_sound.png" )
 			function panel:DoClick()
 				RunConsoleCommand( "streamradio_streamurl",soundConVar:GetString() )
 				ply:EmitSound( "ambient/levels/prison/radio_random"..math.random( 3, 14 )..".wav" )
 			end
-			dform:AddItem( panel )
+			dForm:AddItem( panel )
 		end
 
 
-	local dform = vgui.Create( "DForm", panel )
-		cpanel:AddItem( dform )
-		dform:SetLabel( "Sound effects" )
-		dform:SetPaintBackground( false )
-		dform:DockPadding( 0, 0, 0, 5 )
-		dform:SetExpanded( false )
-		function dform:Paint(w, h)
+	local dForm = vgui.Create( "DForm", panel )
+		cpanel:AddItem( dForm )
+		dForm:SetLabel( "Sound effects" )
+		dForm:SetPaintBackground( false )
+		dForm:DockPadding( 0, 0, 0, 5 )
+		dForm:SetExpanded( false )
+		function dForm:Paint(w, h)
 			paint( self, w, h )
 		end
 
-		local panel = dform:NumSlider( "Volume", mode.."_volume", 0, 1 )
+		local panel = dForm:NumSlider( "Volume", mode.."_volume", 0, 1 )
 			panel:SetToolTip( "The loudness of the sound, in proportion of max volume.\nThis doesn't affect the distance at which the sound is heard." )
 
 		-- Valid sound level values are int 0 to 255 (https://github.com/ValveSoftware/source-sdk-2013/blob/0d8dceea4310fde5706b3ce1c70609d72a38efdf/sp/src/public/soundflags.h#L53)
-		local panel = dform:NumSlider( t.."sndlvl", mode.."_sndlvl", 0, 255, 0 )
+		local levelSlider = dForm:NumSlider( t.."sndlvl", mode.."_sndlvl", 0, 255, 0 )
 			panel:SetToolTip( "The sound's level, in decibels (dB).\nThis affects the distance at which the sound is heard.\nBelow 1 dB sounds play globally. Very high values can reduce volume." )
-			function panel:OnValueChanged( value )
+			function levelSlider:OnValueChanged( value )
 				self:SetValue( math.Clamp( value, 0, 255 ) ) -- visual
-				self:SetValue(math.SnapTo(value,1))
+				self:SetValue( math.SnapTo(value,1) )
+			end
+		
+		pitchSlider = dForm:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
+			pitchSlider:SetToolTip( "The pitch percentage of the sound." )
+
+		local scriptPitchCheck = dForm:CheckBox( t.."usescriptpitch", mode.."_usescriptpitch" )
+			scriptPitchCheck:SetToolTip( "Use the (random) pitch that is saved in soundscripts.\nIf the pitch is random, shown value will be an average." )
+			function scriptPitchCheck:OnChange( isChecked )
+				pitchSlider:updatePitch()
 			end
 
-		local panel = dform:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
-			panel:SetToolTip( "The pitch percentage of the sound." )
+		function pitchSlider:updatePitch( snd )
+			self:SetEnabled( true )
+			if scriptPitchCheck:GetChecked() then
+				local pitch = getSoundScriptMeanPitch( soundConVar:GetString() or "" )
+				if pitch then
+					self:SetValue( pitch )
+					self:SetEnabled( false )
+				end
+			end
+		end
 
-		local checkbox = dform:CheckBox( t.."usescriptpitch", mode.."_usescriptpitch" )
-			checkbox:SetToolTip( "If the sound is a soundscript, the pitch you set above will be overridden." )
-
-		local panel = dform:NumSlider( t.."dsp", mode.."_dsp", 0, 133, 0 )
+		local panel = dForm:NumSlider( t.."dsp", mode.."_dsp", 0, 133, 0 )
 			panel:SetToolTip( "Apply reverb, delay, stereo effect, tone, etc..\nCheck the wiki for more info.\nhttps://wiki.facepunch.com/gmod/DSP_Presets" )
-			dform:ControlHelp( "Leave this at 0 for no sound modification.")
+			dForm:ControlHelp( "Leave this at 0 for no sound modification.")
 	
-	local dform = vgui.Create( "DForm", panel )
-		cpanel:AddItem( dform )
-		dform:SetLabel( "Time-related options" )
-		dform:SetPaintBackground( false )
-		dform:DockPadding( 0, 0, 0, 5 )
-		dform:SetExpanded( false )
-		function dform:Paint(w, h)
+	local dForm = vgui.Create( "DForm", panel )
+		cpanel:AddItem( dForm )
+		dForm:SetLabel( "Time-related options" )
+		dForm:SetPaintBackground( false )
+		dForm:DockPadding( 0, 0, 0, 5 )
+		dForm:SetExpanded( false )
+		function dForm:Paint(w, h)
 			paint( self, w, h )
 		end
 
-		local panel = dform:NumSlider( t.."delay", mode.."_delay", 0, 100 )
-			panel:SetToolTip( "How many seconds to wait before starting the sound emitter." )
+		local delaySlider = dForm:NumSlider( t.."delay", mode.."_delay", 0, 100 )
+			delaySlider:SetToolTip( "How many seconds to wait before starting the sound emitter." )
 
-		local panel = dform:NumSlider( t.."length", mode.."_length", 0, 300 )
-			panel:SetToolTip( "How long before the sound stops or repeats, in seconds.\nSet to 0 or below for infinite duration." )
+		lengthSlider = dForm:NumSlider( t.."length", mode.."_length", 0, 100 )
+			lengthSlider:SetToolTip( "How long before the sound stops by iself, in seconds.\nSet to 0 or below for never." )
 
-		local checkbox = dform:CheckBox( t.."autolength", mode.."_autolength" )
-			checkbox:SetToolTip( "Set the play length to the approximate length of the sound.\nThis can be inaccurate for self-looping sounds." )	
-			function checkbox:OnChange( isChecked )
-				panel:SetEnabled( not isChecked )
+		local autoCheck = dForm:CheckBox( t.."autolength", mode.."_autolength" )
+			autoCheck:SetToolTip( "Set the play length to the approximate length of the sound.\nThis isn't always accurate." )	
+			function autoCheck:OnChange( isChecked )
+				lengthSlider:SetEnabled( not isChecked )
+				lengthSlider:updateLength()
+			end
+			
+		function lengthSlider:updateLength()
+			if autoCheck:GetChecked() then
+				local snd = soundConVar:GetString()
+				local pitch = pitchSlider:GetValue()
+				local prop = sound.GetProperties( snd )
+				if prop then
+					local s = prop.sound
+					snd = istable(s) and s[1] or s
+				end
+				-- use 'Scratch' for min/max bypass
+				self.Scratch:SetValue( MSECalculateDuration( snd or "", pitch ) )
+				self:ValueChanged( self:GetValue() )
+			end
+		end
+
+		local loopSlider = dForm:NumSlider( t.."looplength", mode.."_looplength", 0, 100 )
+			loopSlider:SetToolTip( "How long before the sound emitter restarts, in seconds.\nSet to 0 or below for never (this means no looping)." )
+
+		local sameCheck = dForm:CheckBox( t.."samelength", mode.."_samelength" )
+			sameCheck:SetToolTip( "Set the Loop Length to the same duration as the Play Length.")
+			function sameCheck:OnChange( isChecked )
+				loopSlider:SetEnabled( not isChecked )
 			end
 
-	local dform = vgui.Create( "DForm", panel )
-		cpanel:AddItem( dform )
-		dform:SetLabel( "Activation options" )
-		dform:SetPaintBackground( false )
-		dform:DockPadding( 0, 0, 0, 5 )
-		dform:SetExpanded( false )
-		function dform:Paint(w, h)
+		-- use 'Scratch' for min/max bypass
+		function lengthSlider.Scratch:OnValueChanged( value )
+			if sameCheck:GetChecked() then
+				loopSlider.Scratch:SetValue( value )
+				loopSlider:ValueChanged( value )
+			end
+		end
+			
+
+	local dForm = vgui.Create( "DForm", panel )
+		cpanel:AddItem( dForm )
+		dForm:SetLabel( "Activation options" )
+		dForm:SetPaintBackground( false )
+		dForm:DockPadding( 0, 0, 0, 5 )
+		dForm:SetExpanded( false )
+		function dForm:Paint(w, h)
 			paint( self, w, h )
 		end
 
-		local checkbox = dform:CheckBox( "Toggle", mode.."_toggle" )
+		local checkbox = dForm:CheckBox( "Toggle", mode.."_toggle" )
 			checkbox:SetToolTip( "Toggle turning the sound emitter on and off." )
 
-		local panel = dform:CheckBox( t.."nostoptoggle", mode.."_nostoptoggle" )
-			panel:SetToolTip( "Toggling the sound never stops the sound, instead it restarts it.\nUseful only if '"..checkbox:GetText().."' is on." )
+		local panel = dForm:CheckBox( t.."nostoptoggle", mode.."_nostoptoggle" )
+			panel:SetToolTip( "Toggling the sound emitter always starts the sound.\nUseful only if '"..checkbox:GetText().."' is on." )
 
 		function checkbox:OnChange( isChecked )
 			panel:SetEnabled( isChecked )
 		end
 
-		local panel = dform:CheckBox( "Reverse", mode.."_reverse" )
+		local panel = dForm:CheckBox( "Reverse", mode.."_reverse" )
 			panel:SetToolTip( "Reverse the activation order." )
-		
-		local panel = dform:CheckBox( "Loop", mode.."_looping" )
-			panel:SetToolTip( "Replay the sound after the play length is over.\nFor self-looping sounds it's better to set this off and the play length to -1." )
 
-		local checkbox = dform:CheckBox( t.."dmgactivate", mode.."_dmgactivate" )
+		local checkbox = dForm:CheckBox( t.."dmgactivate", mode.."_dmgactivate" )
 			checkbox:SetToolTip( "The emitter will activate if something damages it." )
 
-		local panel = dform:CheckBox( t.."dmgtoggle", mode.."_dmgtoggle" )
+		local panel = dForm:CheckBox( t.."dmgtoggle", mode.."_dmgtoggle" )
 			panel:SetToolTip( "If something damages the emitter it will toggle but only if '"..checkbox:GetText().."' is on." )
 		
 		function checkbox:OnChange( isChecked )
