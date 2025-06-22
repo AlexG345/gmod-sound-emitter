@@ -166,7 +166,7 @@ elseif SERVER then
 		-- Limit the pitch
 		if t.pitch then t.pitch = math.Clamp(t.pitch, 0, 255) end	
 		
-		-- Limit the play length
+		-- Limit the loop length
 		if t.looplength and t.looplength > 0 then
 			local minLoopLength = GetConVar( "sv_mv_soundemitter_min_looplength" ):GetFloat() or 0 -- error if cvar doesn't exist
 			if t.looplength < minLoopLength then
@@ -462,7 +462,7 @@ function TOOL.BuildCPanel(cpanel)
 
 		-- Valid sound level values are int 0 to 255 (https://github.com/ValveSoftware/source-sdk-2013/blob/0d8dceea4310fde5706b3ce1c70609d72a38efdf/sp/src/public/soundflags.h#L53)
 		local levelSlider = dForm:NumSlider( t.."sndlvl", mode.."_sndlvl", 0, 255, 0 )
-			panel:SetToolTip( "The sound's level, in decibels (dB).\nThis affects the distance at which the sound is heard.\nBelow 1 dB sounds play globally. Very high values can reduce volume." )
+			levelSlider:SetToolTip( "The sound's level, in decibels (dB).\nThis affects the distance at which the sound is heard.\nBelow 1 dB sounds play globally. Very high values can reduce volume." )
 			function levelSlider:OnValueChanged( value )
 				self:SetValue( math.Clamp( value, 0, 255 ) ) -- visual
 				self:SetValue( math.SnapTo(value,1) )
@@ -490,7 +490,7 @@ function TOOL.BuildCPanel(cpanel)
 
 		local panel = dForm:NumSlider( t.."dsp", mode.."_dsp", 0, 133, 0 )
 			panel:SetToolTip( "Apply reverb, delay, stereo effect, tone, etc..\nCheck the wiki for more info.\nhttps://wiki.facepunch.com/gmod/DSP_Presets" )
-			dForm:ControlHelp( "Leave this at 0 for no sound modification.")
+			dForm:ControlHelp( "Leave this at 0 if you don't know what it is.")
 	
 	local dForm = vgui.Create( "DForm", panel )
 		cpanel:AddItem( dForm )
@@ -506,10 +506,10 @@ function TOOL.BuildCPanel(cpanel)
 			delaySlider:SetToolTip( "How many seconds to wait before starting the sound emitter." )
 
 		lengthSlider = dForm:NumSlider( t.."length", mode.."_length", 0, 100 )
-			lengthSlider:SetToolTip( "How long before the sound stops by iself, in seconds.\nSet to 0 or below for never." )
+			lengthSlider:SetToolTip( "How many seconds before the sound stops by itself.\nSet to 0 or below for infinite length." )
 
 		local autoCheck = dForm:CheckBox( t.."autolength", mode.."_autolength" )
-			autoCheck:SetToolTip( "Set the play length to the approximate length of the sound.\nThis isn't always accurate." )	
+			autoCheck:SetToolTip( "Set the play length to an approximation of the length of the sound.\nThis isn't always accurate." )	
 			function autoCheck:OnChange( isChecked )
 				lengthSlider:SetEnabled( not isChecked )
 				lengthSlider:updateLength()
@@ -531,7 +531,7 @@ function TOOL.BuildCPanel(cpanel)
 		end
 
 		local loopSlider = dForm:NumSlider( t.."looplength", mode.."_looplength", 0, 100 )
-			loopSlider:SetToolTip( "How long before the sound emitter restarts, in seconds.\nSet to 0 or below for never (this means no looping)." )
+			loopSlider:SetToolTip( "How long before the sound emitter restarts, in seconds.\nSet to 0 or below for never (no looping)." )
 
 		local sameCheck = dForm:CheckBox( t.."samelength", mode.."_samelength" )
 			sameCheck:SetToolTip( "Set the Loop Length to the same duration as the Play Length.")
@@ -562,14 +562,14 @@ function TOOL.BuildCPanel(cpanel)
 			checkbox:SetToolTip( "Toggle turning the sound emitter on and off." )
 
 		local panel = dForm:CheckBox( t.."nostoptoggle", mode.."_nostoptoggle" )
-			panel:SetToolTip( "Toggling the sound emitter always starts the sound.\nUseful only if '"..checkbox:GetText().."' is on." )
+			panel:SetToolTip( "Toggling the sound emitter starts or restarts the sound, but never stops it.\nWorks only if '"..checkbox:GetText().."' is checked." )
 
 		function checkbox:OnChange( isChecked )
 			panel:SetEnabled( isChecked )
 		end
 
 		local panel = dForm:CheckBox( "Reverse", mode.."_reverse" )
-			panel:SetToolTip( "Reverse the activation order." )
+			panel:SetToolTip( "If checked, the default state will be on instead of off." )
 
 		local checkbox = dForm:CheckBox( t.."dmgactivate", mode.."_dmgactivate" )
 			checkbox:SetToolTip( "The emitter will activate if something damages it." )
