@@ -66,6 +66,9 @@ function ENT:StartEmit()
 	local snd = self:GetSound()
 	local sndscript
 	local pitch = self:GetPitch()
+	local fadeIn = self:GetFadeIn()
+	local volume = self:GetVolume()
+	local startVolume = fadeIn > 0 and 0 or volume
 
 	if snd and sound.GetProperties( snd ) then
 		sndscript = sound.GetProperties( snd )
@@ -86,7 +89,9 @@ function ENT:StartEmit()
 	self.MySound = CreateSound( self, snd or self.NullSound, self.soundRF )
 	self.MySound:SetSoundLevel( self:GetSoundLevel() )
 	self.MySound:SetDSP( self:GetDSP() )
-	self.MySound:PlayEx( self:GetVolume(), pitch )
+	self.MySound:PlayEx( startVolume, pitch )
+	if startVolume != volume then self.MySound:ChangeVolume( volume, fadeIn ) end
+
 	
 	-- We can calculate the duration here since we've finally picked an exact sound
 	-- Maybe we should save length per sound in a table instead of recalculating each time...
@@ -98,7 +103,7 @@ function ENT:StartEmit()
 	if loopLength > 0 then
 		if length > 0 and length < loopLength then
 			timer.Create("SoundStop_"..entindex, length, 1, function()
-				emitter:StopMySound() -- but stay enabled
+				emitter:FadeOut( false ) -- stay enabled
 			end)
 		end
 		timer.Create("SoundStart_"..entindex, loopLength, 1, function()
@@ -106,22 +111,27 @@ function ENT:StartEmit()
 		end)
 	elseif length > 0 then 
 		timer.Create("SoundStop_"..entindex, length, 1, function()
-			emitter:StopEmit()
+			emitter:FadeOut( true )
 		end)
 	end
 end
 
 
 function ENT:PreEmit()
-
-	if self:GetOn() then self:StopEmit() end
+	
+	if self:GetOn() then
+		self:StopEmit()
+	else
+		self:ClearTimers()
+	end
 
 	self:SetOn( true )
 	local delay = self:GetDelay()
 	if delay <= 0 then self:StartEmit() return end
 
-	local entindex = self:EntIndex()
 	local emitter = self
+	local entindex = self:EntIndex()
+
 	timer.Create("SoundStart_"..entindex, delay, 1, function()
 		emitter:StartEmit()
 	end)
@@ -131,6 +141,37 @@ function ENT:StopMySound()
 	if self.MySound then self.MySound:Stop() end
 end
 
+function ENT:FadeOut( stopEmit )
+	
+	if stopEmit then
+		self:SetOn( false )
+		self:ClearTimers()
+	end
+
+	local fadeOut = self:GetFadeOut()
+	if self.MySound and fadeOut > 0 then
+		self.MySound:FadeOut( fadeOut )
+		
+		if stopEmit then
+			local emitter = self
+			local entindex = self:EntIndex()
+
+			timer.Create("SoundStop_"..entindex, fadeOut, 1, function()
+				emitter:StopEmit()
+			end)
+		end
+		
+		return
+	end
+
+	if stopEmit then
+		self:StopEmit()
+	else
+		self:StopMySound()
+	end
+end
+
+
 function ENT:StopEmit()
 	self:SetOn( false )
 	self:ClearTimers()
@@ -139,7 +180,7 @@ end
 
 function ENT:ToggleSound()
 	if self:GetOn() and not self:GetNoStopToggle() then
-		self:StopEmit()
+		self:FadeOut( true )
 	else
 		self:PreEmit()
 	end
@@ -158,7 +199,7 @@ function ENT:Use( activator, caller, useType, value )
 		local a, b = USE_ON, USE_OFF
 		if self:GetReverse() then a, b = b, a end
 		if useType == a then self:PreEmit() end
-		if useType == b then self:StopEmit() end
+		if useType == b then self:FadeOut( true ) end
 	end
 
 	return true
@@ -180,7 +221,7 @@ end
 local function Up( pl, ent )
 	if not ent:IsValid() then return false end
 
-	if not ent:GetToggle() then ent:StopEmit() end
+	if not ent:GetToggle() then ent:FadeOut( true ) end
 
 	return true
 end

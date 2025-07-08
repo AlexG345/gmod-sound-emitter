@@ -21,6 +21,8 @@ TOOL.ClientConVar[ "dsp" ]				= "0"
 TOOL.ClientConVar[ "usescriptpitch" ] 	= "0"
 TOOL.ClientConVar[ "nostoptoggle" ] 	= "0"
 TOOL.ClientConVar[ "samelength" ] 		= "1"
+TOOL.ClientConVar[ "fadein" ] 			= "0"
+TOOL.ClientConVar[ "fadeout" ] 			= "0"
 
 local soundConVar,pitchConVar,dspConVar,volumeConVar
 
@@ -78,6 +80,8 @@ if CLIENT then
 	language.Add( t..".nostoptoggle", "Toggle always plays" )
 	language.Add( t..".looplength", "Loop Length" )
 	language.Add( t..".samelength", "Use play length as loop length" )
+	language.Add( t..".fadein", "Fade-in duration" )
+	language.Add( t..".fadeout", "Fade-out duration" )
 	t = nil
 
 	language.Add( "SBoxLimit_mv_soundemitters", "You've hit the Sound Emitter limit!" )
@@ -102,7 +106,7 @@ elseif SERVER then
 	end
 	cvars = nil
 
-	local dupeKeys = { "model", "sound", "length", "looplength", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch", "nostoptoggle", "samelength" }
+	local dupeKeys = { "model", "sound", "length", "looplength", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch", "nostoptoggle", "samelength", "fadein", "fadeout" }
 
 	 -- Returns a table with keys dupeKeys and values ...
 	local function toMSEProperties( ... )
@@ -134,7 +138,9 @@ elseif SERVER then
 		"DSP",
 		"UseScriptPitch",
 		"NoStopToggle",
-		"SameLength"
+		"SameLength",
+		"FadeIn",
+		"FadeOut"
 	)
 
 	local function updateMSE( emitter, ply, t ) -- t = properties table
@@ -263,7 +269,9 @@ elseif SERVER then
 			self:GetClientNumber("dsp"),
 			self:GetClientBool("usescriptpitch"),
 			self:GetClientBool("nostoptoggle"),
-			self:GetClientBool("samelength")
+			self:GetClientBool("samelength"),
+			self:GetClientNumber("fadein"),
+			self:GetClientNumber("fadeout")
 		)
 
 		if isMSE( ent ) and ( ent:GetPlayer() == ply ) then
@@ -538,6 +546,12 @@ function TOOL.BuildCPanel(cpanel)
 			function sameCheck:OnChange( isChecked )
 				loopSlider:SetEnabled( not isChecked )
 			end
+
+		local fadeInSlider = dForm:NumSlider( t.."fadein", mode.."_fadein", 0, 10 )
+			fadeInSlider:SetToolTip( "How many seconds it takes for the sound's volume to reach its max when played. Applies during loops." )
+
+		local fadeOutSlider = dForm:NumSlider( t.."fadeout", mode.."_fadeout", 0, 10 )
+			fadeOutSlider:SetToolTip( "How many seconds it takes for the sound's volume to drop to 0 when stopped. Applies during loops." )
 
 		-- use 'Scratch' for min/max bypass
 		function lengthSlider.Scratch:OnValueChanged( value )
