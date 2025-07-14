@@ -24,7 +24,7 @@ TOOL.ClientConVar[ "samelength" ] 		= "1"
 TOOL.ClientConVar[ "fadein" ] 			= "0"
 TOOL.ClientConVar[ "fadeout" ] 			= "0"
 
-local soundConVar,pitchConVar,dspConVar,volumeConVar
+local soundConVar, pitchConVar, dspConVar, volumeConVar
 
 cleanup.Register( "mv_soundemitter" )
 
@@ -41,6 +41,17 @@ local function isMSE( ent )
 	return isentity( ent ) and ent:IsValid() and ( ent:GetClass() == "mv_soundemitter" )
 end
 
+local conVars =  {
+	sbox_maxmv_soundemitters = 3,
+	sv_mv_soundemitter_min_looplength = game.SinglePlayer() and 0 or 0.15,
+	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 105,
+	sv_mv_soundemitter_check_dsp = game.SinglePlayer() and 0 or 1 -- should make this into a table somehow to let people add or remove chosen forbidden DSP
+}
+for name, default in pairs( conVars ) do
+	if not ConVarExists( name ) then CreateConVar( name, default, { FCVAR_REPLICATED, FCVAR_NOTIFY,  } ) end
+end
+conVars = nil
+
 if CLIENT then
 
 	local function refreshConVar()
@@ -52,7 +63,7 @@ if CLIENT then
 	-- lua refresh....
 	refreshConVar()
 	
-	hook.Add("InitPostEntity","mv_soundemitter_ext_init",function()
+	hook.Add("InitPostEntity", "mv_soundemitter_ext_init", function()
 		-- store convars for sound preview in the menu
 		refreshConVar()
 	end)
@@ -94,17 +105,6 @@ if CLIENT then
 	function TOOL:Reload( trace )		return isMSE( trace.Entity ) end
 
 elseif SERVER then
-
-	local cvars =  {
-	sbox_maxmv_soundemitters = 3,
-	sv_mv_soundemitter_min_looplength = game.SinglePlayer() and 0 or 0.15,
-	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 100,
-	sv_mv_soundemitter_check_dsp = game.SinglePlayer() and 0 or 1 -- should make this into a table somehow to let people add or remove chosen forbidden DSP
-	}
-	for name, default in pairs( cvars ) do
-		if not ConVarExists( name ) then CreateConVar( name, default ) end
-	end
-	cvars = nil
 
 	local dupeKeys = { "model", "sound", "length", "looplength", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch", "nostoptoggle", "samelength", "fadein", "fadeout" }
 
@@ -421,7 +421,7 @@ function TOOL.BuildCPanel(cpanel)
 		panel1, panel2 = vgui.Create( "DButton", dForm ), vgui.Create( "DButton", dForm )
 			panel1:SetText( "Sound Preview" )
 			panel1:SetImage( "icon32/unmuted.png" )
-			panel1:SetToolTip( "Does not take looping and play length into account." )
+			panel1:SetToolTip( "Does not take loop/play length and fade in/out into account." )
 			panel1:Dock( TOP )
 			panel1.DoClick = function()
 				if panel1.mySound then panel1.mySound:Stop() end
@@ -469,11 +469,19 @@ function TOOL.BuildCPanel(cpanel)
 			panel:SetToolTip( "The loudness of the sound, in proportion of max volume.\nThis doesn't affect the distance at which the sound is heard." )
 
 		-- Valid sound level values are int 0 to 255 (https://github.com/ValveSoftware/source-sdk-2013/blob/0d8dceea4310fde5706b3ce1c70609d72a38efdf/sp/src/public/soundflags.h#L53)
+		local maxLevelConVar = GetConVar( "sv_mv_soundemitter_max_sndlvl" )
 		local levelSlider = dForm:NumSlider( t.."sndlvl", mode.."_sndlvl", 0, 255, 0 )
 			levelSlider:SetToolTip( "The sound's level, in decibels (dB).\nThis affects the distance at which the sound is heard.\nBelow 1 dB sounds play globally. Very high values can reduce volume." )
 			function levelSlider:OnValueChanged( value )
-				self:SetValue( math.Clamp( value, 0, 255 ) ) -- visual
-				self:SetValue( math.SnapTo(value,1) )
+				self:SetValue( math.Clamp( value, 0, self:GetMax() ) ) -- visual
+				self:SetValue( math.SnapTo( value,1 ) )
+			end
+			
+			function levelSlider:Think()
+				local max = math.Clamp( maxLevelConVar:GetFloat(), 0, 255 )
+				max = max > 0 and max or 255
+				if self:GetMax() == max then return end
+				self:SetMax( max )
 			end
 		
 		pitchSlider = dForm:NumSlider( "Pitch", mode.."_pitch", 0, 255 )
