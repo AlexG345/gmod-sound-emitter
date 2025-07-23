@@ -1,4 +1,4 @@
-function getSoundScriptMeanPitch( soundName )
+function MSEGetScriptMeanPitch( soundName )
 
     local s = sound.GetProperties( soundName )
     return s and ( ( istable(s.pitch) and ( s.pitch[1] + s.pitch[2] ) / 2 ) or s.pitch )
