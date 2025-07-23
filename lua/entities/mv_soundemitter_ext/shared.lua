@@ -1,6 +1,6 @@
 ENT.Type 				= "anim"
 ENT.Base 				= "base_gmodentity"
-ENT.ClassNameOverride	= "mv_soundemitter" -- Keep compability but override original addon with folder name.
+ENT.ClassNameOverride	= "mv_soundemitter" -- old addon compability
 ENT.PrintName			= "MV Sound Emitter"
 ENT.Author				= "Alex"
 ENT.Contact				= ""
@@ -8,8 +8,6 @@ ENT.Purpose				= "To annoy others with your music."
 ENT.Spawnable			= false
 ENT.AdminSpawnable		= false
 ENT.Editable			= true
-
-ENT.NullSound = Sound("common/NULL.WAV")
 
 function ENT:SetupDataTables()
 
@@ -62,7 +60,7 @@ function ENT:SetupDataTables()
 
 	if SERVER then
 
-		self:SetSound( self.NullSound )
+		self:SetSound( "common/NULL.WAV" )
 		self:SetToggle( false )
 		self:SetDamageActivate( false )
 		self:SetDamageToggle( false )

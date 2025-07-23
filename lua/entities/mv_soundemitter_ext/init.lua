@@ -44,7 +44,6 @@ end
    Name: OnRemove
 ---------------------------------------------------------]]
 function ENT:OnRemove()
-	if not self.SetOn then return end
 	self:StopEmit()
 end
 
@@ -88,7 +87,7 @@ function ENT:StartEmit()
 
 	pitch = pitch or self:GetPitch()
 
-	self.MySound = CreateSound( self, snd or self.NullSound, self.soundRF )
+	self.MySound = CreateSound( self, snd or "common/NULL.WAV", self.soundRF )
 	self.MySound:SetSoundLevel( self:GetSoundLevel() )
 	self.MySound:SetDSP( self:GetDSP() )
 	self.MySound:PlayEx( startVolume, pitch )
@@ -97,37 +96,37 @@ function ENT:StartEmit()
 	
 	-- We can calculate the duration here since we've finally picked an exact sound
 	-- Maybe we should save length per sound in a table instead of recalculating each time...
-	local playLength = self:GetAutoLength() and MSECalculateDuration( snd, pitch ) or self:GetLength() or 0
-	local loopLength = self:GetSameLength() and playLength or self:GetLoopLength() or 0
-	local fadeOut = self:GetFadeOut() or 0
-	local preFadeOut = math.max( 0, playLength - fadeOut )
+	local playLength	= self:GetAutoLength() and MSECalculateDuration( snd, pitch ) or self:GetLength() or 0
+	local loopLength	= self:GetSameLength() and playLength or self:GetLoopLength() or 0
+	local fadeOut		= self:GetFadeOut() or 0
+	local preFadeOut	= math.max( 0, playLength - fadeOut )
 	local isFinite, isLooping = playLength > 0, loopLength > 0
-	local willFade = fadeOut > 0 and isFinite and ( preFadeOut < loopLength or not isLooping )
-	local willStop = isFinite and ( playLength < loopLength or not isLooping )
-	local entindex = self:EntIndex()
-	local emitter = self
+	local willFade		= fadeOut > 0 and isFinite and ( preFadeOut < loopLength or not isLooping )
+	local willStop		= isFinite and ( playLength < loopLength or not isLooping )
+	local entindex		= self:EntIndex()
+	local emitter		= self
 
 	if willFade then
 		if preFadeOut > 0 then
-			timer.Create("SoundFadeOut_"..entindex, preFadeOut, 1, function()
+			timer.Create( "SoundFadeOut_"..entindex, preFadeOut, 1, function()
 				emitter:FadeOut( fadeOut )
-			end)
+			end )
 		else emitter:FadeOut( fadeOut ) end
 	end
 
 	if willStop then
 		local f = isLooping and self.StopMySound or self.StopEmit
 		if playLength > 0 then
-			timer.Create("SoundStop_"..entindex, playLength, 1, function()
+			timer.Create( "SoundStop_"..entindex, playLength, 1, function()
 				f( emitter )
-			end)
+			end )
 		else f( emitter ) end
 	end
 
 	if isLooping then
-		timer.Create("SoundStart_"..entindex, loopLength, 1, function()
+		timer.Create( "SoundStart_"..entindex, loopLength, 1, function()
 			emitter:StartEmit()
-		end)
+		end )
 	end
 end
 
@@ -228,7 +227,7 @@ function ENT:Use( activator, caller, useType, value )
 		local on, off = USE_ON, USE_OFF
 		if self:GetReverse() then on, off = off, on end
 		if useType == on then self:PreEmit() end
-		if useType == off then self:Off() self:FadeOutAndStopEmit() end
+		if useType == off then self:FadeOutAndStopEmit() end
 	end
 
 	return true

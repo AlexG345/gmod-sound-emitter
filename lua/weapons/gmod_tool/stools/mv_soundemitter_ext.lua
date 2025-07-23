@@ -38,13 +38,13 @@ end
 
 
 local function isMSE( ent )
-	return isentity( ent ) and ent:IsValid() and ( ent:GetClass() == "mv_soundemitter" )
+	return isentity( ent ) and ent:IsValid() and ent:GetClass() == "mv_soundemitter"
 end
 
 local sv_cvars =  {
 	sbox_maxmv_soundemitters = 3,
 	sv_mv_soundemitter_min_looplength = game.SinglePlayer() and 0 or 0.15,
-	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 105,
+	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 100,
 	sv_mv_soundemitter_check_dsp = game.SinglePlayer() and 0 or 1
 }
 for name, default in pairs( sv_cvars ) do
@@ -330,14 +330,18 @@ elseif SERVER then
 
 		local ent = trace.Entity
 
-		if not ent:IsValid() then return false end
+		if not isentity( ent ) or not ent:IsValid() then return false end
 		
 		local pre = mode.."_"
 		local ply = self:GetOwner()
 		local model = ent:GetModel()
-		if model then ply:ConCommand( ( "%smodel%s" ):format( pre, model ) ) end
-		
-		if not isMSE( ent ) then return false end
+		if not isMSE( ent ) then
+			if model then
+				ply:ConCommand( ( "%smodel %s" ):format( pre, model ) )
+				return true
+			end
+			return false
+		end
 
 		for duName, name in pairs( emitterProperties ) do
 			local getter = name and ent["Get"..name]
