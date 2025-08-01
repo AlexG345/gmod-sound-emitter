@@ -184,7 +184,7 @@ function ENT:FadeOutAndStopEmit( dt1, dt2 )
 	local entindex = self:EntIndex()
 	timer.Remove("SoundStart_"..entindex)
 	timer.Remove("SoundFadeOut_"..entindex)
-	self:DelayStopEmit( dt, entindex )
+	self:DelayStopEmit( dt2, entindex )
 end
 
 function ENT:DelayStopEmit( dt, entindex )
@@ -249,10 +249,13 @@ end
 local function Up( pl, ent )
 	if not ent:IsValid() then return false end
 
-	if ent:GetOn() and not ent:GetToggle() then ent:FadeOutAndStopEmit() end
+	local dt = ent:GetFadeOut()
+
+	if ent:GetOn() and not ent:GetToggle() then ent:FadeOutAndStopEmit( dt, dt ) end
 
 	return true
 end
+
 
 function ENT:UpdateNumpadActions()
 	if self.impulseDown then numpad.Remove( self.impulseDown ) end

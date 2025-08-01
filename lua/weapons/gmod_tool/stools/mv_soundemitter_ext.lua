@@ -41,16 +41,14 @@ local function isMSE( ent )
 	return isentity( ent ) and ent:IsValid() and ent:GetClass() == "mv_soundemitter"
 end
 
-local sv_cvars =  {
-	sbox_maxmv_soundemitters = 3,
-	sv_mv_soundemitter_min_looplength = game.SinglePlayer() and 0 or 0.15,
-	sv_mv_soundemitter_max_sndlvl = game.SinglePlayer() and 0 or 100,
-	sv_mv_soundemitter_check_dsp = game.SinglePlayer() and 0 or 1
-}
-for name, default in pairs( sv_cvars ) do
-	if not ConVarExists( name ) then CreateConVar( name, default, { FCVAR_REPLICATED, FCVAR_NOTIFY,  } ) end
+if SERVER then
+	local s, flags = game.SinglePlayer(), bit.bor( FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY )
+	CreateConVar( "sbox_maxmv_soundemitters", 3, flags, "The maximum amount of sound emitters each player can have.", 0 )
+	CreateConVar( "sv_mv_soundemitter_min_looplength", s and 0 or 0.15, flags, "The minimum duration of a loop.", 0 )
+	CreateConVar( "sv_mv_soundemitter_max_sndlvl", s and 0 or 100, flags, "The maximum sound level, in decibel(s).", 0, 255 )
+	CreateConVar( "sv_mv_soundemitter_check_dsp", s and 0 or 1, flags, "Forbid unwanted DSPs that play global sounds.", 0, 1 )
+	s, flags = nil, nil
 end
-sv_cvars = nil
 
 if CLIENT then
 
@@ -565,7 +563,7 @@ function TOOL.BuildCPanel(cPanel)
 			fadeInSlider:SetToolTip( "How many seconds it takes for the sound's volume to reach its max anytime its played." )
 
 		local fadeOutSlider = dForm:NumSlider( l( "fadeout" )..":", pre.."fadeout", 0, 10 )
-			fadeOutSlider:SetToolTip( "How many seconds it takes for the volume to drop to zero.\nDoesn't make the sound play for longer, except when stopped manually." )
+			fadeOutSlider:SetToolTip( "How many seconds it takes for the volume to drop to zero.\nFade out will begin:\n- (" .. l( "length" ) .. " - " .. l( "fadeout" ) .. ") second(s) after the sound's start\n- Whenever the sound is stopped manually." )
 		
 		function lengthSlider.Scratch:OnValueChanged( value )
 			if sameCheck:GetChecked() then

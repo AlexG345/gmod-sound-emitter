@@ -8,6 +8,7 @@
 		"*.vcproj",
 		"README.md",
 		"LICENSE",
-		"*.git"
+		"*.git",
+		"workshop images*"
 	]
 }
