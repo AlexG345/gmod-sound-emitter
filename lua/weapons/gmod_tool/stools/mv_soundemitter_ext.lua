@@ -60,7 +60,7 @@ if CLIENT then
 	end
 	-- lua refresh....
 	refreshConVar()
-	
+
 	hook.Add( "InitPostEntity", "mv_soundemitter_ext_init", function()
 		-- store convars for sound preview in the menu
 		refreshConVar()
@@ -71,7 +71,7 @@ if CLIENT then
 		{ name = "right" },
 		{ name = "reload" }
 	}
-	
+
 	local t = "tool."..mode.."."
 	local function l( token_suffix, label )
 		language.Add( t..token_suffix, label )
@@ -180,8 +180,8 @@ elseif SERVER then
 		end
 
 		-- Limit the pitch
-		if t.pitch then t.pitch = math.Clamp(t.pitch, 0, 255) end	
-		
+		if t.pitch then t.pitch = math.Clamp(t.pitch, 0, 255) end
+
 		-- Limit the loop length
 		if t.looplength and t.looplength > 0 then
 			local minLoopLength = GetConVar( "sv_mv_soundemitter_min_looplength" ):GetFloat() or 0 -- error if cvar doesn't exist
@@ -215,7 +215,7 @@ elseif SERVER then
 
 	end
 
-	
+
 	local function MakeMVSoundEmitter(  ply, pos, ang, ... ) -- look at dupeKeys table for ... args order !
 
 		if not ply:CheckLimit( "mv_soundemitters" ) then return false end
@@ -304,9 +304,9 @@ elseif SERVER then
 			undo.AddEntity( emitter )
 
 			if ent and do_weld then
-				local weld = constraint.Weld( ent, emitter, trace.PhysicsBone, 0, 0, true, true )
+				local weld = constraint.Weld( emitter, ent, trace.PhysicsBone, 0, 0, true, true )
 
-				local physobj = emitter:GetPhysicsObject() 
+				local physobj = emitter:GetPhysicsObject()
 				if IsValid( physobj ) then physobj:EnableCollisions( false ) end
 				emitter.nocollide = true
 				undo.AddEntity( weld )
@@ -316,12 +316,12 @@ elseif SERVER then
 		undo.Finish()
 
 		return true
-	end	
+	end
 
 
 	function TOOL:RightClick( trace )
 		return self:LeftClick( trace, false )
-	end	
+	end
 
 
 	function TOOL:Reload( trace )
@@ -329,7 +329,7 @@ elseif SERVER then
 		local ent = trace.Entity
 
 		if not isentity( ent ) or not ent:IsValid() then return false end
-		
+
 		local pre = mode.."_"
 		local ply = self:GetOwner()
 		local model = ent:GetModel()
@@ -411,7 +411,7 @@ function TOOL.BuildCPanel(cPanel)
 
 	local keyBinder = cPanel:KeyBinder( l("key"), pre.."key" )
 		keyBinder:SetToolTip( "The keyboard key that can set on and off the sound emitter." )
-	
+
 	cPanel:PropSelect( "Preset Models", pre.."model", list.Get( "MVSoundEmitterModel" ), 2)
 	cPanel:TextEntry( "Model:", pre.."model" )
 
@@ -434,8 +434,8 @@ function TOOL.BuildCPanel(cPanel)
 
 	local panel = cPanel:TextEntry( l("sound")..":", pre.."sound" )
 		panel:SetToolTip( "A sound from the game content.\nSupports soundscripts, .mp3, .ogg, .wav." )
-	
-	
+
+
 	local dForm = customDForm( "Sound manipulation", true )
 
 		previewButton, stopButton = vgui.Create( "DButton", dForm ), vgui.Create( "DButton", dForm )
@@ -461,7 +461,7 @@ function TOOL.BuildCPanel(cPanel)
 				end
 			end
 			dForm:AddItem( previewButton, stopButton )
-		
+
 		-- Helper button for stream radios
 		if scripted_ents.Get( "base_streamradio" ) then
 			local panel = vgui.Create( "DButton", dForm )
@@ -488,14 +488,14 @@ function TOOL.BuildCPanel(cPanel)
 				self:SetValue( math.Clamp( value, 0, self:GetMax() ) ) -- visual
 				self:SetValue( math.SnapTo( value,1 ) )
 			end
-			
+
 			function levelSlider:Think()
 				local max = math.Clamp( maxLevelConVar:GetFloat(), 0, 255 )
 				max = max > 0 and max or 255
 				if self:GetMax() == max then return end
 				self:SetMax( max )
 			end
-		
+
 		pitchSlider = dForm:NumSlider( l( "pitch" )..":", pre.."pitch", 0, 255 )
 			pitchSlider:SetToolTip( "The pitch percentage of the sound.\nSet to 100 for no modification." )
 
@@ -519,7 +519,7 @@ function TOOL.BuildCPanel(cPanel)
 		local panel = dForm:NumSlider( l( "dsp" )..":", pre.."dsp", 0, 133, 0 )
 			panel:SetToolTip( "Apply reverb, delay, stereo effect, tone, etc..\nCheck the wiki for more info.\nhttps://wiki.facepunch.com/gmod/DSP_Presets" )
 			dForm:ControlHelp( "Leave this at 0 if you don't know what it is." )
-	
+
 	local dForm = customDForm( "Time-related options", false )
 
 		local delaySlider = dForm:NumSlider( l( "delay" )..":", pre.."delay", 0, 100 )
@@ -529,12 +529,12 @@ function TOOL.BuildCPanel(cPanel)
 			lengthSlider:SetToolTip( "How many seconds before the sound emitter turns off, when the sound is started.\nDuring loops, only the sound will stop, not the sound emitter.\nSet to 0 or below to never stop." )
 
 		local autoCheck = dForm:CheckBox( l( "autolength" ), pre.."autolength" )
-			autoCheck:SetToolTip( "Set the play length to an approximation of the length of the sound.\nThis isn't always accurate." )	
+			autoCheck:SetToolTip( "Set the play length to an approximation of the length of the sound.\nThis isn't always accurate." )
 			function autoCheck:OnChange( isChecked )
 				lengthSlider:SetEnabled( not isChecked )
 				lengthSlider:updateLength()
 			end
-			
+
 		function lengthSlider:updateLength()
 			if autoCheck:GetChecked() then
 				local snd = soundConVar:GetString()
@@ -564,14 +564,14 @@ function TOOL.BuildCPanel(cPanel)
 
 		local fadeOutSlider = dForm:NumSlider( l( "fadeout" )..":", pre.."fadeout", 0, 10 )
 			fadeOutSlider:SetToolTip( "How many seconds it takes for the volume to drop to zero.\nFade out will begin:\n- (" .. l( "length" ) .. " - " .. l( "fadeout" ) .. ") second(s) after the sound's start\n- Whenever the sound is stopped manually." )
-		
+
 		function lengthSlider.Scratch:OnValueChanged( value )
 			if sameCheck:GetChecked() then
 				loopSlider.Scratch:SetValue( value )
 				loopSlider:ValueChanged( value )
 			end
 		end
-			
+
 
 	local dForm = customDForm( "Activation options", false )
 
@@ -593,7 +593,7 @@ function TOOL.BuildCPanel(cPanel)
 
 		local dmgToggleCB = dForm:CheckBox( l( "dmgtoggle" ), pre.."dmgtoggle" )
 			dmgToggleCB:SetToolTip( "If something damages the emitter it will toggle but only if '"..dmgActivateCB:GetText().."' is on." )
-		
+
 		function dmgActivateCB:OnChange( isChecked )
 			dmgToggleCB:SetEnabled( isChecked )
 		end
@@ -607,7 +607,7 @@ function TOOL:UpdateGhostMVSoundEmitter( ent, player )
 
 	local trace = player:GetEyeTrace()
 	if not trace.Hit then return end
-	
+
 	local trEnt = trace.Entity
 	if not trEnt then return end
 
@@ -628,7 +628,7 @@ end
 
 
 function TOOL:Think()
-	
+
 	local ent = self.GhostEntity
 	local model = self:GetClientInfo( "model" )
 	if not ( ent and ent:IsValid() ) or ( ent:GetModel() ~= model ) then
