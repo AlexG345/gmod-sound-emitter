@@ -80,15 +80,15 @@ function ENT:SetupDataTables()
 		self:SetSameLength( true )
 		self:SetFadeIn( 0 )
 		self:SetFadeOut( 0 )
-	
+
 	end
 
  end
 
 
 function ENT:UpdateSound()
-	
+
 	local soundName = self:GetSound()
 	if soundName then util.PrecacheSound( soundName ) end
-	
+
 end

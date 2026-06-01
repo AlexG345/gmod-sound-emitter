@@ -11,7 +11,7 @@ function ENT:Initialize()
 	self:SetSolid( SOLID_VPHYSICS )
 	self:SetUseType( ONOFF_USE ) -- Unreliable
 	self.soundRF = RecipientFilter()
-	
+
 	local phys = self:GetPhysicsObject()
 	if phys and phys:IsValid() then phys:Wake() end
 
@@ -52,7 +52,7 @@ end
    Name: Emit Functions
 ---------------------------------------------------------]]
 function ENT:StartEmit()
-	
+
 	if not self then return end
 
 	self.isFadingOut = false
@@ -60,7 +60,7 @@ function ENT:StartEmit()
 	-- I tried many methods (e.g. a pool of csoundpatches) but this is the only one which keeps sound script randomness,
 	-- up-to-date recipient filters (RF) even during looping, and custom pitch/volume.
 	-- https://github.com/Facepunch/garrysmod-issues/issues/5877 exact same problem I think.
-	
+
 	if self.soundRF then self.soundRF:AddPAS( self:GetPos() ) end
 
 	local snd = self:GetSound()
@@ -71,7 +71,7 @@ function ENT:StartEmit()
 	local startVolume = fadeIn > 0 and 0 or volume
 
 	if sndscript then
-		if istable(sndscript.sound) then 
+		if istable(sndscript.sound) then
 			snd = sndscript.sound[math.random( #sndscript.sound )]--more efficient than table.Random( sndscript.sound )
 		else
 			snd = sndscript.sound
@@ -93,7 +93,7 @@ function ENT:StartEmit()
 	self.MySound:PlayEx( startVolume, pitch )
 	if startVolume != volume then self.MySound:ChangeVolume( volume, fadeIn ) end
 
-	
+
 	-- We can calculate the duration here since we've finally picked an exact sound
 	-- Maybe we should save length per sound in a table instead of recalculating each time...
 	local playLength	= self:GetAutoLength() and MSECalculateDuration( snd, pitch ) or self:GetLength() or 0
@@ -108,7 +108,7 @@ function ENT:StartEmit()
 
 	if willFade then
 		if preFadeOut > 0 then
-			timer.Create( "SoundFadeOut_"..entindex, preFadeOut, 1, function()
+			timer.Create( "SoundFadeOut_" .. entindex, preFadeOut, 1, function()
 				emitter:FadeOut( fadeOut )
 			end )
 		else emitter:FadeOut( fadeOut ) end
@@ -117,14 +117,14 @@ function ENT:StartEmit()
 	if willStop then
 		local f = isLooping and self.StopMySound or self.StopEmit
 		if playLength > 0 then
-			timer.Create( "SoundStop_"..entindex, playLength, 1, function()
+			timer.Create( "SoundStop_" .. entindex, playLength, 1, function()
 				f( emitter )
 			end )
 		else f( emitter ) end
 	end
 
 	if isLooping then
-		timer.Create( "SoundStart_"..entindex, loopLength, 1, function()
+		timer.Create( "SoundStart_" .. entindex, loopLength, 1, function()
 			emitter:StartEmit()
 		end )
 	end
@@ -132,9 +132,9 @@ end
 
 
 function ENT:PreEmit()
-	
+
 	self:ClearTimers()
-	
+
 	if self:GetOn() then
 		self:StopEmit()
 	else
@@ -147,7 +147,7 @@ function ENT:PreEmit()
 	if delay <= 0 then self:StartEmit() return end
 
 	local emitter = self
-	timer.Create("SoundStart_"..self:EntIndex(), delay, 1, function()
+	timer.Create("SoundStart_" .. self:EntIndex(), delay, 1, function()
 		emitter:StartEmit()
 	end)
 end
@@ -182,8 +182,8 @@ function ENT:FadeOutAndStopEmit( dt1, dt2 )
 	if not self.isFadingOut then self:FadeOut( dt1 ) end
 
 	local entindex = self:EntIndex()
-	timer.Remove("SoundStart_"..entindex)
-	timer.Remove("SoundFadeOut_"..entindex)
+	timer.Remove("SoundStart_" .. entindex)
+	timer.Remove("SoundFadeOut_" .. entindex)
 	self:DelayStopEmit( dt2, entindex )
 end
 
@@ -191,7 +191,7 @@ function ENT:DelayStopEmit( dt, entindex )
 	dt = dt or self:GetLength()
 	if dt > 0 then
 		local emitter = self
-		local id = "SoundStop_"..( entindex or self:EntIndex() )
+		local id = "SoundStop_" .. ( entindex or self:EntIndex() )
 		if not timer.Exists( id ) or timer.TimeLeft( id ) > dt then
 			timer.Create( id, dt, 1, function()
 				emitter:StopEmit()
@@ -199,7 +199,7 @@ function ENT:DelayStopEmit( dt, entindex )
 		end
 	else
 		self:StopEmit()
-	end	
+	end
 end
 
 
@@ -215,9 +215,9 @@ end
 
 function ENT:ClearTimers()
 	local entindex = self:EntIndex()
-	timer.Remove("SoundStart_"..entindex)
-	timer.Remove("SoundFadeOut_"..entindex)
-	timer.Remove("SoundStop_"..entindex)
+	timer.Remove("SoundStart_" .. entindex)
+	timer.Remove("SoundFadeOut_" .. entindex)
+	timer.Remove("SoundStop_" .. entindex)
 end
 
 function ENT:Use( activator, caller, useType, value )
