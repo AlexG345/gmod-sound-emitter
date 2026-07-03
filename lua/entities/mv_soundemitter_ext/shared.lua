@@ -13,45 +13,47 @@ function ENT:SetupDataTables()
 
 	local c
 	local t = "#tool.mv_soundemitter_ext."
-	self:NetworkVar( "Float",	0,	"Key" )
-	self:NetworkVar( "String",	0,	"Sound",			{ KeyName = "sound",		  Edit = { type = "String",	order = 0 } } )
+	self:NetworkVar( "Float",	"Key" )
+	self:NetworkVar( "String",	"Sound",			{ KeyName = "sound",			Edit = { type = "String",	order = 0 } } )
 	c = "Sound effects"
-	self:NetworkVar( "Float",	1,	"Volume",			{ KeyName = "volume",		  Edit = { type = "Float",	order = 10,	category = c, min = 0, max = 1 } } )
-	self:NetworkVar( "Float",	2,	"SoundLevel" )
-	self:NetworkVar( "Float",	3,	"Pitch",			{ KeyName = "pitch",		  Edit = { type = "Float",	order = 11,	category = c, min = 0, max = 255 } } )
-	self:NetworkVar( "Bool",	0,	"UseScriptPitch",	{ KeyName = "sndscriptpitch", Edit = { type = "Bool",	order = 12,	category = c, title = t.."usescriptpitch" } })
-	self:NetworkVar( "Int",		0,	"DSP",				{ KeyName = "DSP", 			  Edit = { type = "Int", 	order = 13,	category = c, title = t.."dsp", min = 0, max = 133 } } )
+	self:NetworkVar( "Float",	"Volume",			{ KeyName = "volume",			Edit = { type = "Float",	order = 10,	category = c, min = 0, max = 1 } } )
+	self:NetworkVar( "Float",	"SoundLevel" )
+	self:NetworkVar( "Float",	"Pitch",			{ KeyName = "pitch",			Edit = { type = "Float",	order = 11,	category = c, min = 0, max = 255 } } )
+	self:NetworkVar( "Float",	"PitchRandAmp",		{ KeyName = "pitchrandamp",		Edit = { type = "Float",	order = 12,	category = c, title = t .. "pitchrandamp", min = 0, max = 255 } } )
+	self:NetworkVar( "Bool",	"UseScriptPitch",	{ KeyName = "sndscriptpitch",	Edit = { type = "Bool",		order = 13,	category = c, title = t .. "usescriptpitch" } } )
+	self:NetworkVar( "Int",		"DSP",				{ KeyName = "DSP",				Edit = { type = "Int",		order = 14,	category = c, title = t .. "dsp", min = 0, max = 133 } } )
 	c = "Time related options"
-	self:NetworkVar( "Float",	4,	"Delay",			{ KeyName = "delay",		  Edit = { type = "Float",	order = 20,	category = c, title = t.."delay", min = 0, max = 100 } } )
- 	self:NetworkVar( "Float",	5,	"Length",			{ KeyName = "length",		  Edit = { type = "Float",	order = 21,	category = c, title = t.."length", min = 0, max = 100 } } )
-	self:NetworkVar( "Bool",	1,	"AutoLength",		{ KeyName = "autolength",	  Edit = { type = "Bool",	order = 22,	category = c, title = t.."autolength" } } )
-	self:NetworkVar( "Float",	6,	"LoopLength",		{ KeyName = "looplength",	  Edit = { type = "Float",	order = 23,	category = c, title = t.."looplength", min = 0, max = 100 } } )
-	self:NetworkVar( "Bool",	2,	"SameLength",		{ KeyName = "samelength",	  Edit = { type = "Bool",	order = 24,	category = c, title = t.."samelength" } })
-	self:NetworkVar( "Float",	7,	"FadeIn",			{ KeyName = "fadein",		  Edit = { type = "Float",	order = 25,	category = c, title = t.."fadein" } })
-	self:NetworkVar( "Float",	8,	"FadeOut",			{ KeyName = "fadeout",		  Edit = { type = "Float",	order = 26,	category = c, title = t.."fadeout" } })
+	self:NetworkVar( "Float",	"Delay",			{ KeyName = "delay",			Edit = { type = "Float",	order = 20,	category = c, title = t .. "delay", min = 0, max = 100 } } )
+	self:NetworkVar( "Float",	"Length",			{ KeyName = "length",			Edit = { type = "Float",	order = 21,	category = c, title = t .. "length", min = 0, max = 100 } } )
+	self:NetworkVar( "Bool",	"AutoLength",		{ KeyName = "autolength",		Edit = { type = "Bool",		order = 22,	category = c, title = t .. "autolength" } } )
+	self:NetworkVar( "Float",	"LoopLength",		{ KeyName = "looplength",		Edit = { type = "Float",	order = 23,	category = c, title = t .. "looplength", min = 0, max = 100 } } )
+	self:NetworkVar( "Bool",	"SameLength",		{ KeyName = "samelength",		Edit = { type = "Bool",		order = 24,	category = c, title = t .. "samelength" } })
+	self:NetworkVar( "Int",		"MaxLoopCount",		{ KeyName = "maxloopcount",		Edit = { type = "Int",		order = 25,	category = c, title = t .. "maxloopcount", min = 0, max = 500 } } )
+	self:NetworkVar( "Float",	"FadeIn",			{ KeyName = "fadein",			Edit = { type = "Float",	order = 26,	category = c, title = t .. "fadein" } })
+	self:NetworkVar( "Float",	"FadeOut",			{ KeyName = "fadeout",			Edit = { type = "Float",	order = 27,	category = c, title = t .. "fadeout" } })
 	c = "Activation options"
-	self:NetworkVar( "Bool",	3,	"Toggle",			{ KeyName = "toggle",		  Edit = { type = "Bool",	order = 30, category = c } } )
-	self:NetworkVar( "Bool",	4,	"NoStopToggle",		{ KeyName = "nostoptoggle",	  Edit = { type = "Bool",	order = 31,	category = c, title = t.."nostoptoggle" } })
-	self:NetworkVar( "Bool",	5,	"Reverse",			{ KeyName = "reverse",		  Edit = { type = "Bool",	order = 32, category = c } } )
-	self:NetworkVar( "Bool",	6,	"DamageActivate",	{ KeyName = "dmgactivate",	  Edit = { type = "Bool",	order = 33, category = c, title = t.."dmgactivate" } } )
-	self:NetworkVar( "Bool",	7,	"DamageToggle",		{ KeyName = "dmgtoggle",	  Edit = { type = "Bool",	order = 34, category = c, title = t.."dmgtoggle" } } )
-	self:NetworkVar( "Bool",	8,	"On" )
+	self:NetworkVar( "Bool",	"Toggle",			{ KeyName = "toggle",			Edit = { type = "Bool",	order = 30, category = c } } )
+	self:NetworkVar( "Bool",	"NoStopToggle",		{ KeyName = "nostoptoggle",		Edit = { type = "Bool",	order = 31,	category = c, title = t .. "nostoptoggle" } })
+	self:NetworkVar( "Bool",	"Reverse",			{ KeyName = "reverse",			Edit = { type = "Bool",	order = 32, category = c } } )
+	self:NetworkVar( "Bool",	"DamageActivate",	{ KeyName = "dmgactivate",		Edit = { type = "Bool",	order = 33, category = c, title = t .. "dmgactivate" } } )
+	self:NetworkVar( "Bool",	"DamageToggle",		{ KeyName = "dmgtoggle",		Edit = { type = "Bool",	order = 34, category = c, title = t .. "dmgtoggle" } } )
+	self:NetworkVar( "Bool",	"On" )
 
 	local setter = self.SetKey
-	self.SetKey = function( self, key )
+	function self:SetKey( key )
 		setter( self, key )
 		self:UpdateNumpadActions()
 	end
 
 	local setter = self.SetReverse
-	self.SetReverse = function( self, reverse )
+	function self:SetReverse( reverse )
 		if reverse == self:GetReverse() then return end
 		setter( self, reverse )
 		self:UpdateNumpadActions()
 	end
 
 	local setter = self.SetSound
-	self.SetSound = function( self, sound )
+	function self:SetSound( sound )
 		-- Need to stop the old sound before updating.
 		if self:GetOn() then self:StopEmit() end
 		setter( self, sound )
@@ -80,10 +82,12 @@ function ENT:SetupDataTables()
 		self:SetSameLength( true )
 		self:SetFadeIn( 0 )
 		self:SetFadeOut( 0 )
+		self:SetPitchRandAmp( 0 )
+		self:SetMaxLoopCount( -1 )
 
 	end
 
- end
+end
 
 
 function ENT:UpdateSound()

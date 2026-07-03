@@ -23,6 +23,8 @@ TOOL.ClientConVar[ "nostoptoggle" ] 	= "0"
 TOOL.ClientConVar[ "samelength" ] 		= "1"
 TOOL.ClientConVar[ "fadein" ] 			= "0"
 TOOL.ClientConVar[ "fadeout" ] 			= "0"
+TOOL.ClientConVar[ "pitchrandamp" ]		= "0"
+TOOL.ClientConVar[ "maxloopcount" ]		= "-1"
 
 local soundConVar, pitchConVar, dspConVar, volumeConVar
 
@@ -36,10 +38,6 @@ if file.Exists( "soundemitter_ext/custom_sound_presets.txt", "DATA" ) then
 	end
 end
 
-
-local function isMSE( ent )
-	return isentity( ent ) and ent:IsValid() and ent:GetClass() == "mv_soundemitter"
-end
 
 if SERVER then
 	local s, flags = game.SinglePlayer(), bit.bor( FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY )
@@ -103,8 +101,9 @@ if CLIENT then
 	l( "samelength", "Use play length as loop length" )
 	l( "fadein", "Fade-in duration" )
 	l( "fadeout", "Fade-out duration" )
-	t = nil
-	l = nil
+	l( "pitchrandamp", "Pitch random amplitude" )
+	l( "maxloopcount", "Max loop count" )
+	t, l = nil, nil
 
 	language.Add( "SBoxLimit_mv_soundemitters", "You've hit the Sound Emitter limit!" )
 	language.Add( "mv_soundemitter", "Sound Emitter" )
@@ -113,138 +112,9 @@ if CLIENT then
 
 	function TOOL:LeftClick( trace )	return not( trace.Entity and trace.Entity:IsPlayer() ) end
 	function TOOL:RightClick( trace )	return self:LeftClick( trace ) end
-	function TOOL:Reload( trace )		return isMSE( trace.Entity ) end
+	function TOOL:Reload( trace )		return MVSoundEmitter.IsSoundEmitter( trace.Entity ) end
 
 elseif SERVER then
-
-	local dupeKeys = { "model", "sound", "length", "looplength", "delay", "toggle", "dmgactivate", "dmgtoggle", "volume", "pitch", "key", "nocollide", "autolength", "reverse", "sndlvl", "dsp", "usescriptpitch", "nostoptoggle", "samelength", "fadein", "fadeout" }
-
-	 -- Returns a table with keys dupeKeys and values ...
-	local function toMSEProperties( ... )
-		local values = { ... }
-		local t = {}
-		for i, k in ipairs( dupeKeys ) do
-			t[k] = values[i]
-		end
-		return t
-	end
-
-	-- Those are the properties you want to use a setter function on when the emitter is created.
-	local emitterProperties = toMSEProperties(
-		"Model",
-		"Sound",
-		"Length",
-		"LoopLength",
-		"Delay",
-		"Toggle",
-		"DamageActivate",
-		"DamageToggle",
-		"Volume",
-		"Pitch",
-		"Key",
-		nil,
-		"AutoLength",
-		"Reverse",
-		"SoundLevel",
-		"DSP",
-		"UseScriptPitch",
-		"NoStopToggle",
-		"SameLength",
-		"FadeIn",
-		"FadeOut"
-	)
-
-	local function updateMSE( emitter, ply, t ) -- t = properties table
-
-		if not isMSE( emitter ) then return end
-
-		-- false might once have been saved as "0"
-		local bool_props = { "toggle", "dmgactivate", "dmgtoggle", "nocollide", "autolength", "reverse", "usescriptpitch", "nostoptoggle", "samelength" }
-		for _, prop in ipairs( bool_props ) do
-			if t[prop] == "0" or t[prop] == 0 then
-				t[prop] = false
-			end
-		end
-
-		if ply and not emitter:GetPlayer():IsPlayer() then
-			emitter:SetPlayer(ply)
-		end
-		ply = emitter:GetPlayer()
-
-		if t.dsp and GetConVar( "sv_mv_soundemitter_check_dsp" ):GetInt() ~= 0 then
-			local forbidden = { [35] = true, [36] = true, [37] = true, [39] = true }
-			if forbidden[t.dsp] then
-				ply:ChatPrint( "This DSP is forbidden! Changed from " .. t.dsp .. " to 0." )
-				t.dsp = 0
-			end
-		end
-
-		-- Limit the pitch
-		if t.pitch then t.pitch = math.Clamp(t.pitch, 0, 255) end
-
-		-- Limit the loop length
-		if t.looplength and t.looplength > 0 then
-			local minLoopLength = GetConVar( "sv_mv_soundemitter_min_looplength" ):GetFloat() or 0 -- error if cvar doesn't exist
-			if t.looplength < minLoopLength then
-				if ply then ply:ChatPrint( ( "Loop length too short! Changed from %s to %.2f second(s)." ):format( t.looplength, minLoopLength ) ) end
-				t.looplength = minLoopLength
-			end
-		end
-
-		-- Limit the sound level.
-		if t.sndlvl then
-			local maxSndLvl = GetConVar( "sv_mv_soundemitter_max_sndlvl" ):GetFloat() or 100
-			-- Sound levels <= 1 play at infinite distances.
-			if maxSndLvl > 0 and ( t.sndlvl <= 1 or t.sndlvl > maxSndLvl ) then
-				if ply then ply:ChatPrint( ( "Sound level too high! Changed from %s to %.2f decibel(s)" ):format( t.sndlvl, maxSndLvl ) ) end
-				t.sndlvl = maxSndLvl
-			end
-			t.sndlvl = math.Clamp( t.sndlvl, 0, 255 ) -- valid range
-		end
-
-		for duName, value in pairs( t ) do
-			if value ~= nil then
-				local name = emitterProperties[duName]
-				if name then emitter["Set" .. name]( emitter, value ) end
-				emitter[duName] = value
-			end
-		end
-
-		if t.nocollide then emitter:SetCollisionGroup( COLLISION_GROUP_WORLD ) end
-		if t.reverse then emitter:PreEmit() end
-
-	end
-
-
-	local function MakeMVSoundEmitter(  ply, pos, ang, ... ) -- look at dupeKeys table for ... args order !
-
-		if not ply:CheckLimit( "mv_soundemitters" ) then return false end
-
-		-- Get the emitter properties table
-		local t = ( type( ... ) == "table" ) and ... or toMSEProperties( ... )
-
-		if not ( t.model and util.IsValidModel( t.model ) ) then
-			ply:ChatPrint( "Invalid model!" )
-			return false
-		end
-
-		local emitter = ents.Create( "mv_soundemitter" ) or NULL
-		if not emitter:IsValid() then return false end
-
-		emitter:SetPos( pos )
-		emitter:SetAngles( ang )
-		emitter:SetModel( t.model )
-		emitter:Spawn()
-		updateMSE( emitter, ply, t )
-
-		ply:AddCount( "mv_soundemitters", emitter )
-		ply:AddCleanup( "mv_soundemitter", emitter )
-
-		return emitter
-	end
-
-	duplicator.RegisterEntityClass( "mv_soundemitter", MakeMVSoundEmitter, "pos", "ang", unpack( dupeKeys ) )
-
 
 	function TOOL:LeftClick( trace, do_weld )
 
@@ -257,7 +127,7 @@ elseif SERVER then
 
 		local ply = self:GetOwner()
 
-		local t = toMSEProperties(
+		local t = MVSoundEmitter.ToSoundEmitterProperties(
 			self:GetClientInfo( "model" ),
 			self:GetClientInfo( "sound" ),
 			self:GetClientNumber( "length" ),
@@ -278,13 +148,15 @@ elseif SERVER then
 			self:GetClientBool( "nostoptoggle" ),
 			self:GetClientBool( "samelength" ),
 			self:GetClientNumber( "fadein" ),
-			self:GetClientNumber( "fadeout" )
+			self:GetClientNumber( "fadeout" ),
+			self:GetClientNumber( "pitchrandamp" ),
+			self:GetClientNumber( "maxloopcount" )
 		)
 
-		if isMSE( ent ) and ent:GetPlayer() == ply then
+		if MVSoundEmitter.IsSoundEmitter( ent ) and ent:GetPlayer() == ply then
 
 			t.model = nil
-			updateMSE( ent, nil, t )
+			MVSoundEmitter.UpdateSoundEmitter( ent, nil, t )
 			return true
 
 		end
@@ -293,7 +165,7 @@ elseif SERVER then
 		local ang = trace.HitNormal:Angle()
 		ang.pitch = ang.pitch + 90
 
-		local emitter = MakeMVSoundEmitter( ply, pos, ang, t )
+		local emitter = MVSoundEmitter.MakeSoundEmitter( ply, pos, ang, t )
 
 		if not emitter then return false end
 
@@ -333,7 +205,7 @@ elseif SERVER then
 		local pre = mode .. "_"
 		local ply = self:GetOwner()
 		local model = ent:GetModel()
-		if not isMSE( ent ) then
+		if not MVSoundEmitter.IsSoundEmitter( ent ) then
 			if model then
 				ply:ConCommand( ( "%smodel %s" ):format( pre, model ) )
 				return true
@@ -341,14 +213,14 @@ elseif SERVER then
 			return false
 		end
 
-		for duName, name in pairs( emitterProperties ) do
+		for duplicatorKey, name in pairs( MVSoundEmitter.soundEmitterProperties ) do
 			local getter = name and ent["Get" .. name]
 			local val
 			if getter then val = getter( ent ) end
-			if val == nil then val = ent[duName] end -- dupekey fallback
+			if val == nil then val = ent[duplicatorKey] end -- dupekey fallback
 			if val ~= nil then
-				if type(val) == "number" then val = math.Round(val, 2) end
-				ply:ConCommand( ( "%s%s %s" ):format( pre, duName, val ) )
+				if type(val) == "number" then val = math.Round(val, 3) end
+				ply:ConCommand( ( "%s%s %s" ):format( pre, duplicatorKey, val ) )
 			end
 		end
 
@@ -399,7 +271,7 @@ function TOOL.BuildCPanel(cPanel)
 	local propertySheet = vgui.Create( "DPropertySheet" )
 	cPanel:AddItem( propertySheet )
 	propertySheet:Dock( TOP )
-	propertySheet:SetTall( 340 )
+	propertySheet:SetTall( 380 )
 	propertySheet:SetBGColor( color_black )
 	propertySheet:SetPadding( 0 )
 
@@ -447,6 +319,14 @@ function TOOL.BuildCPanel(cPanel)
 			function streamRadioButton:DoClick()
 				RunConsoleCommand( "streamradio_streamurl",soundConVar:GetString() )
 				ply:EmitSound( "ambient/levels/prison/radio_random" .. math.random( 3, 14 ) .. ".wav" )
+			end
+
+			local soundBrowserButton = vgui.Create( "DButton" )
+			soundNameSheet:AddItem( soundBrowserButton )
+			soundBrowserButton:SetText( "Open Sound Browser" )
+			soundBrowserButton:SetImage( "icon16/phone_sound.png" )
+			function soundBrowserButton:DoClick()
+				MVSoundEmitter.OpenSoundBrowser()
 			end
 		end
 
@@ -504,6 +384,9 @@ function TOOL.BuildCPanel(cPanel)
 		pitchSlider = soundEffectsSheet:NumSlider( l( "pitch" ) .. ":", pre .. "pitch", 0, 255 )
 			pitchSlider:SetTooltip( "The pitch percentage of the sound.\nSet to 100 for no modification." )
 
+		local pitchRandAmpSlider = soundEffectsSheet:NumSlider( l( "pitchrandamp" ) .. ":", pre .. "pitchrandamp", 0, 255 )
+			pitchRandAmpSlider:SetTooltip( "The pitch random amplitude percentage of the sound.\nSet to 0 for no modification." )
+
 		local scriptPitchCheck = soundEffectsSheet:CheckBox( l( "usescriptpitch" ), pre .. "usescriptpitch" )
 			scriptPitchCheck:SetTooltip( "Use the (random) pitch that is saved in soundscripts.\nIf the pitch is random, shown value will be an average.\nWorks only for soundscripts (sounds which don't end with .wav/.ogg/.mp3/...)" )
 			function scriptPitchCheck:OnChange( isChecked )
@@ -519,21 +402,22 @@ function TOOL.BuildCPanel(cPanel)
 					self:SetEnabled( false )
 				end
 			end
+			self:SetDark( self:IsEnabled() )
 		end
 
 
 		local dspBigHelp = soundEffectsSheet:Help( l( "dsp" ) .. ":" )
 			dspBigHelp:SetTooltip( "Apply reverb, delay, stereo effect, tone, etc .. \nCheck the wiki for more info.\nhttps://wiki.facepunch.com/gmod/DSP_Presets" )
 
-		local dspComboBox, dspComboBoxLabel = soundEffectsSheet:ComboBox( "", pre .. "dsp" )
-			dspComboBoxLabel:SetWide( 0 )
+		local dspComboBox, dspComboBoxLabel = soundEffectsSheet:ComboBox( "Choose:", pre .. "dsp" )
+			dspComboBoxLabel:SetWide( 60 )
 			dspComboBox:Dock( TOP )
 			dspComboBox:SetSortItems( false )
 			for _, dsp in pairs( MVSoundEmitter.DSP ) do
 				dspComboBox:AddChoice( MVSoundEmitter.DSPInfo[dsp].name, dsp, dsp == 1 )
 			end
 
-		local dspSlider = soundEffectsSheet:NumSlider( "Enter manually:", pre .. "dsp", 0, 133, 0 )
+		local dspSlider = soundEffectsSheet:NumSlider( "Set manually:", pre .. "dsp", 0, 133, 0 )
 			local dspHelp = soundEffectsSheet:ControlHelp( "" )
 			function dspSlider:OnValueChanged( dsp )
 				local info = MVSoundEmitter.DSPInfo[dsp]
@@ -542,18 +426,20 @@ function TOOL.BuildCPanel(cPanel)
 				dspHelp:SetText( text )
 			end
 
+
 	local soundTimingSheet = createSheet( "Timing", "icon16/clock_edit.png" )
 
 		local delaySlider = soundTimingSheet:NumSlider( l( "delay" ) .. ":", pre .. "delay", 0, 100 )
 			delaySlider:SetTooltip( "How many seconds to wait before starting the sound emitter." )
 
 		lengthSlider = soundTimingSheet:NumSlider( l( "length" ) .. ":", pre .. "length", 0, 100 )
-			lengthSlider:SetTooltip( "How many seconds before the sound emitter turns off, when the sound is started.\nDuring loops, only the sound will stop, not the sound emitter.\nSet to 0 or below to never stop." )
+			lengthSlider:SetTooltip( "How many seconds before the sound emitter turns off, when the sound is started.\nThis also works during loops.\nSet to 0 or below to never stop." )
 
 		local autoCheck = soundTimingSheet:CheckBox( l( "autolength" ), pre .. "autolength" )
 			autoCheck:SetTooltip( "Set the play length to an approximation of the length of the sound.\nThis isn't always accurate." )
 			function autoCheck:OnChange( isChecked )
 				lengthSlider:SetEnabled( not isChecked )
+				lengthSlider:SetDark( not isChecked ) -- otherwise it stays gray sometimes for some reason ??
 				lengthSlider:updateLength()
 			end
 
@@ -567,7 +453,7 @@ function TOOL.BuildCPanel(cPanel)
 					snd = istable(s) and s[1] or s
 				end
 				-- use 'Scratch' for min/max bypass
-				self.Scratch:SetValue( MSECalculateDuration( snd or "", pitch ) )
+				self.Scratch:SetValue( MVSoundEmitter.CalculateSoundDuration( snd or "", pitch ) )
 				self:ValueChanged( self:GetValue() )
 			end
 		end
@@ -575,10 +461,17 @@ function TOOL.BuildCPanel(cPanel)
 		local loopSlider = soundTimingSheet:NumSlider( l( "looplength" ) .. ":", pre .. "looplength", 0, 100 )
 			loopSlider:SetTooltip( "How often the sound replays, in seconds.\nSet to 0 or below for never (no looping)." )
 
+		local maxLoopCountSlider = soundTimingSheet:NumSlider( l( "maxloopcount" ) .. ":", pre .. "maxloopcount", -1, 20, 0 )
+			maxLoopCountSlider:SetTooltip( "How many times the sound will re-play after the first time.\nSet to -1 for infinite looping.\nSet to 0 for no looping." )
+
 		local sameCheck = soundTimingSheet:CheckBox( l( "samelength" ), pre .. "samelength" )
 			sameCheck:SetTooltip( "Set the Loop Length to the same duration as the Play Length." )
 			function sameCheck:OnChange( isChecked )
 				loopSlider:SetEnabled( not isChecked )
+				loopSlider:SetDark( not isChecked ) -- otherwise it stays gray sometimes for some reason ??
+				if isChecked then
+					lengthSlider.Scratch:OnValueChanged( lengthSlider:GetValue() )
+				end
 			end
 
 		local fadeInSlider = soundTimingSheet:NumSlider( l( "fadein" ) .. ":", pre .. "fadein", 0, 10 )
@@ -593,6 +486,12 @@ function TOOL.BuildCPanel(cPanel)
 				loopSlider:ValueChanged( value )
 			end
 		end
+
+
+
+	local modelSheet = createSheet( "Model", "icon16/eye.png", vgui.Create( "ControlPanel" ) )
+		modelSheet:PropSelect( "Preset models", pre .. "model", list.Get( "MVSoundEmitterExtModel" ), 3 )
+		modelSheet:TextEntry( "Model name:", pre .. "model" )
 
 
 	previewButton, stopButton = vgui.Create( "DButton" ), vgui.Create( "DButton" )
@@ -619,10 +518,6 @@ function TOOL.BuildCPanel(cPanel)
 		end
 		cPanel:AddItem( previewButton, stopButton )
 
-
-	cPanel:PropSelect( "Sound emitter model", pre .. "model", list.Get( "MVSoundEmitterExtModel" ), 2)
-	cPanel:TextEntry( "Model name:", pre .. "model" )
-
 end
 
 
@@ -636,7 +531,7 @@ function TOOL:UpdateGhostMVSoundEmitter( ent, player )
 	local trEnt = trace.Entity
 	if not trEnt then return end
 
-	if isMSE( trEnt ) or trEnt:IsPlayer() then
+	if MVSoundEmitter.IsSoundEmitter( trEnt ) or trEnt:IsPlayer() then
 		ent:SetNoDraw( true )
 		return
 	end

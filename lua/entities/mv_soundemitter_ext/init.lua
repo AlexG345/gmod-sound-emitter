@@ -11,6 +11,7 @@ function ENT:Initialize()
 	self:SetSolid( SOLID_VPHYSICS )
 	self:SetUseType( ONOFF_USE ) -- Unreliable
 	self.soundRF = RecipientFilter()
+	self:Activate()
 
 	local phys = self:GetPhysicsObject()
 	if phys and phys:IsValid() then phys:Wake() end
@@ -40,6 +41,14 @@ function ENT:OnTakeDamage( dmginfo )
 	end
 end
 
+-- --[[-------------------------------------------------------
+--    Name: PhysicsCollide
+-- ---------------------------------------------------------]]
+
+-- function ENT:PhysicsCollide( data, phys )
+-- 	if ( (data.OurOldVelocity - data.OurNewVelocity):Length() + data.HitSpeed:Length() > 100 ) then self:ToggleSound() end
+-- end
+
 --[[-------------------------------------------------------
    Name: OnRemove
 ---------------------------------------------------------]]
@@ -51,33 +60,37 @@ end
 --[[-------------------------------------------------------
    Name: Emit Functions
 ---------------------------------------------------------]]
-function ENT:StartEmit()
+function ENT:StartEmit( currentLoopCount )
 
 	if not self then return end
 
+	currentLoopCount = currentLoopCount or 0
+
 	self.isFadingOut = false
 	self:StopMySound()
-	-- I tried many methods (e.g. a pool of csoundpatches) but this is the only one which keeps sound script randomness,
+	-- I tried other methods (e.g. a pool of csoundpatches) but this is the only one which keeps sound script randomness,
 	-- up-to-date recipient filters (RF) even during looping, and custom pitch/volume.
 	-- https://github.com/Facepunch/garrysmod-issues/issues/5877 exact same problem I think.
 
 	if self.soundRF then self.soundRF:AddPAS( self:GetPos() ) end
 
-	local snd = self:GetSound()
-	local sndscript = snd and sound.GetProperties( snd )
+	local snd			= self:GetSound()
+	local sndscript		= snd and sound.GetProperties( snd )
 	local pitch
-	local fadeIn = self:GetFadeIn()
-	local volume = self:GetVolume()
-	local startVolume = fadeIn > 0 and 0 or volume
+	local fadeIn		= self:GetFadeIn()
+	local volume		= self:GetVolume()
+	local startVolume	= fadeIn > 0 and 0 or volume
 
 	if sndscript then
 		if istable(sndscript.sound) then
+			-- TODO: save #sndscript.sound when setting the sound instead of recalculating it each time
 			snd = sndscript.sound[math.random( #sndscript.sound )]--more efficient than table.Random( sndscript.sound )
 		else
 			snd = sndscript.sound
 		end
 
 		if self:GetUseScriptPitch() then
+			-- TODO: could use the random amplitude property? would use the same logic as normal sounds then
 			pitch = sndscript.pitch
 			if istable( pitch ) then
 				pitch = math.random( pitch[1] or pitch.pitchstart, pitch[2] or pitch.pitchend )
@@ -85,24 +98,32 @@ function ENT:StartEmit()
 		end
 	end
 
-	pitch = pitch or self:GetPitch()
+	if not pitch then
+		amp = self:GetPitchRandAmp()
+		pitch = math.Max( 0, self:GetPitch() + math.random( - amp, amp ) )
+	end
 
 	self.MySound = CreateSound( self, snd or "common/NULL.WAV", self.soundRF )
-	self.MySound:SetSoundLevel( self:GetSoundLevel() )
-	self.MySound:SetDSP( self:GetDSP() )
-	self.MySound:PlayEx( startVolume, pitch )
-	if startVolume != volume then self.MySound:ChangeVolume( volume, fadeIn ) end
+		self.MySound:SetSoundLevel( self:GetSoundLevel() )
+		self.MySound:SetDSP( self:GetDSP() )
+		self.MySound:PlayEx( startVolume, pitch )
+		if startVolume ~= volume then self.MySound:ChangeVolume( volume, fadeIn ) end
 
 
 	-- We can calculate the duration here since we've finally picked an exact sound
 	-- Maybe we should save length per sound in a table instead of recalculating each time...
-	local playLength	= self:GetAutoLength() and MSECalculateDuration( snd, pitch ) or self:GetLength() or 0
-	local loopLength	= self:GetSameLength() and playLength or self:GetLoopLength() or 0
+	local playLength	= self:GetAutoLength() and MVSoundEmitter.CalculateSoundDuration( snd, pitch ) or self:GetLength() or 0
+	local maxLoopCount	= self:GetMaxLoopCount()
+	local loopLength	= ( currentLoopCount < maxLoopCount or maxLoopCount < 0 ) and ( self:GetSameLength() and playLength or self:GetLoopLength() ) or 0
+
 	local fadeOut		= self:GetFadeOut() or 0
 	local preFadeOut	= math.max( 0, playLength - fadeOut )
-	local isFinite, isLooping = playLength > 0, loopLength > 0
+
+	local isFinite		= playLength > 0
+	local isLooping		= loopLength > 0
 	local willFade		= fadeOut > 0 and isFinite and ( preFadeOut < loopLength or not isLooping )
 	local willStop		= isFinite and ( playLength < loopLength or not isLooping )
+
 	local entindex		= self:EntIndex()
 	local emitter		= self
 
@@ -111,7 +132,7 @@ function ENT:StartEmit()
 			timer.Create( "SoundFadeOut_" .. entindex, preFadeOut, 1, function()
 				emitter:FadeOut( fadeOut )
 			end )
-		else emitter:FadeOut( fadeOut ) end
+		else self:FadeOut( fadeOut ) end
 	end
 
 	if willStop then
@@ -120,12 +141,14 @@ function ENT:StartEmit()
 			timer.Create( "SoundStop_" .. entindex, playLength, 1, function()
 				f( emitter )
 			end )
-		else f( emitter ) end
+		else f( self ) end
 	end
 
+	print(currentLoopCount)
 	if isLooping then
 		timer.Create( "SoundStart_" .. entindex, loopLength, 1, function()
-			emitter:StartEmit()
+			print( maxLoopCount >= 0 and currentLoopCount + 1 )
+			emitter:StartEmit( maxLoopCount >= 0 and currentLoopCount + 1 )
 		end )
 	end
 end
@@ -154,9 +177,9 @@ end
 
 
 
-function ENT:FadeOut( dt )
+function ENT:FadeOut( fadeOut )
 	self.isFadingOut = true
-	if self.MySound then self.MySound:FadeOut( dt or self:GetFadeOut() ) end
+	if self.MySound then self.MySound:FadeOut( fadeOut or self:GetFadeOut() ) end
 end
 
 
