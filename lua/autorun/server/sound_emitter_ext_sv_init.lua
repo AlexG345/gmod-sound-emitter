@@ -128,7 +128,7 @@ function MVSoundEmitter.UpdateSoundEmitter( emitter, ply, properties )
 	for duplicatorKey, value in pairs( properties ) do
 		if value ~= nil then
 			local name = MVSoundEmitter.soundEmitterProperties[duplicatorKey]
-			if name then print("Set" .. name, value) emitter["Set" .. name]( emitter, value ) end
+			if name then emitter["Set" .. name]( emitter, value ) end
 			emitter[duplicatorKey] = value
 		end
 	end

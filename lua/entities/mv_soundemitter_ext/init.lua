@@ -144,10 +144,8 @@ function ENT:StartEmit( currentLoopCount )
 		else f( self ) end
 	end
 
-	print(currentLoopCount)
 	if isLooping then
 		timer.Create( "SoundStart_" .. entindex, loopLength, 1, function()
-			print( maxLoopCount >= 0 and currentLoopCount + 1 )
 			emitter:StartEmit( maxLoopCount >= 0 and currentLoopCount + 1 )
 		end )
 	end

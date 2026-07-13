@@ -102,7 +102,7 @@ if CLIENT then
 	l( "fadein", "Fade-in duration" )
 	l( "fadeout", "Fade-out duration" )
 	l( "pitchrandamp", "Pitch random amplitude" )
-	l( "maxloopcount", "Max loop count" )
+	l( "maxloopcount", "Replay count" )
 	t, l = nil, nil
 
 	language.Add( "SBoxLimit_mv_soundemitters", "You've hit the Sound Emitter limit!" )
@@ -263,32 +263,41 @@ function TOOL.BuildCPanel(cPanel)
 
 	local col_gray = Color( 240, 240, 240 )
 
-	local function paint( panel, w, h )
+	local function paint( panel, w, h, col )
 		local margin = 5
-		draw.RoundedBoxEx( 4, margin, margin, w - 2 * margin, h - margin, col_gray, true, true, true, true )
+		draw.RoundedBoxEx( 4, margin, margin, w - 2 * margin, h - margin, col, true, true, true, true )
 	end
 
-	local propertySheet = vgui.Create( "DPropertySheet" )
-	cPanel:AddItem( propertySheet )
-	propertySheet:Dock( TOP )
-	propertySheet:SetTall( 380 )
-	propertySheet:SetBGColor( color_black )
-	propertySheet:SetPadding( 0 )
+	local columnSheet = vgui.Create( "DColumnSheet" )
+	cPanel:AddItem( columnSheet )
+	columnSheet:Dock( TOP )
+	columnSheet:SetTall( 420 )
+	columnSheet.Navigation:SetPaintBackground( true )
+	columnSheet.Navigation:SetBackgroundColor( col_gray )
+	if columnSheet.Navigation then columnSheet.Navigation:DockMargin( 0, 10, 0, 0 ) end
 
 	local function createSheet( label, icon, panel )
-		panel = panel or vgui.Create( "DForm" )
-			propertySheet:AddSheet( label, panel, icon )
-			panel:SetPaintBackground( false )
-			panel:DockPadding( 0, 0, 0, 5 )
-			panel:SetExpanded( true )
-			panel:Dock( TOP )
-			panel:SetHeaderHeight( 0 )
-			function panel:Paint( w, h ) paint( self, w, h ) end
+		local scrollPanel = vgui.Create( "DScrollPanel", columnSheet )
+		columnSheet:AddSheet( label, scrollPanel, icon )
+			scrollPanel:Dock( FILL )
+			panel = panel or vgui.Create( "DForm" )
+			scrollPanel:AddItem( panel )
+				panel:SetPaintBackground( false )
+				panel:SetExpanded( true )
+				panel:DockPadding( 0, 0, 0, 5 )
+				panel:SetHeaderHeight( 0 )
+				panel:Dock( TOP )
+				function panel:Paint( w, h ) paint( self, w, h, col_gray ) end
 		return panel
 	end
 
 
-	local soundNameSheet = createSheet( "Sound", "icon16/folder_find.png" )
+	local modelSheet = createSheet( "Model", "icon16/eye.png", vgui.Create( "ControlPanel" ) )
+		modelSheet:PropSelect( "Preset models", pre .. "model", list.Get( "MVSoundEmitterExtModel" ), 3 )
+		modelSheet:TextEntry( "Model name:", pre .. "model" )
+
+
+	local soundNameSheet = createSheet( "Sound name", "icon16/folder_find.png" )
 
 		local sndList = vgui.Create( "DListView" )
 		soundNameSheet:AddItem( sndList )
@@ -321,23 +330,23 @@ function TOOL.BuildCPanel(cPanel)
 				ply:EmitSound( "ambient/levels/prison/radio_random" .. math.random( 3, 14 ) .. ".wav" )
 			end
 
-			local soundBrowserButton = vgui.Create( "DButton" )
-			soundNameSheet:AddItem( soundBrowserButton )
-			soundBrowserButton:SetText( "Open Sound Browser" )
-			soundBrowserButton:SetImage( "icon16/phone_sound.png" )
-			function soundBrowserButton:DoClick()
-				MVSoundEmitter.OpenSoundBrowser()
-			end
+			-- local soundBrowserButton = vgui.Create( "DButton" )
+			-- soundNameSheet:AddItem( soundBrowserButton )
+			-- soundBrowserButton:SetText( "Open Sound Browser" )
+			-- soundBrowserButton:SetImage( "icon16/phone_sound.png" )
+			-- function soundBrowserButton:DoClick()
+			-- 	MVSoundEmitter.OpenSoundBrowser()
+			-- end
 		end
 
 
-	local soundActivationSheet = createSheet( "Trigger", "icon16/transmit_edit.png", vgui.Create( "ControlPanel" ) )
+	local soundActivationSheet = createSheet( "Activation", "icon16/transmit_edit.png", vgui.Create( "ControlPanel" ) )
 
 		local keyBinder = soundActivationSheet:KeyBinder( l("key"), pre .. "key" )
 			keyBinder:SetTooltip( "The keyboard key that can set on and off the sound emitter." )
 
 		local toggleCB = soundActivationSheet:CheckBox( l( "Toggle" ), pre .. "toggle" )
-			toggleCB:SetTooltip( "Toggle turning the sound emitter on and off." )
+			toggleCB:SetTooltip( "Make the sound emitter able to be toggled on/off,\ninstead of having to keep pressing the key." )
 
 		local noStopToggleCB = soundActivationSheet:CheckBox( l( "nostoptoggle" ), pre .. "nostoptoggle" )
 			noStopToggleCB:SetTooltip( "Toggling the sound emitter starts or restarts the sound, but never stops it.\nWorks only if '" .. toggleCB:GetText() .. "' is checked." )
@@ -359,16 +368,28 @@ function TOOL.BuildCPanel(cPanel)
 			dmgToggleCB:SetEnabled( isChecked )
 		end
 
+		local activationResetButton = vgui.Create( "DButton", soundActivationSheet )
+		soundActivationSheet:AddItem( activationResetButton )
+		activationResetButton:SetText( "Reset checkboxes" )
+		activationResetButton:SetImage( "icon16/arrow_rotate_clockwise.png" )
+		activationResetButton:DockMargin( 40, 15, 40, 0 )
+		function activationResetButton:DoClick()
+			for _, suffix in ipairs( { "toggle", "nostoptoggle", "reverse", "dmgactivate", "dmgtoggle" } ) do
+				local cVar = GetConVar( mode .. "_" .. suffix )
+				if cVar then cVar:Revert() end
+			end
+		end
 
-	local soundEffectsSheet = createSheet( "Effects", "icon16/control_equalizer_blue.png" )
+
+	local soundEffectsSheet = createSheet( "Sound effects", "icon16/control_equalizer_blue.png" )
 
 		local volumeSlider = soundEffectsSheet:NumSlider( l( "volume" ) .. ":", pre .. "volume", 0, 1 )
-			volumeSlider:SetTooltip( "The loudness of the sound.\nThis doesn't affect how far the sound can be heard." )
+			volumeSlider:SetTooltip( "The loudness of the sound.\nThis doesn't directly affect how far the sound can be heard." )
 
 		-- Valid sound level values are int 0 to 255 (https://github.com/ValveSoftware/source-sdk-2013/blob/0d8dceea4310fde5706b3ce1c70609d72a38efdf/sp/src/public/soundflags.h#L53)
 		local maxLevelConVar = GetConVar( "sv_mv_soundemitter_max_sndlvl" )
 		local levelSlider = soundEffectsSheet:NumSlider( l( "sndlvl" ) .. ":", pre .. "sndlvl", 0, 255, 0 )
-			levelSlider:SetTooltip( "The sound's level, in decibels (dB).\nThis affects how far the sound can be heard.\nBelow 1 dB sounds play globally. Very high values can reduce volume." )
+			levelSlider:SetTooltip( "The sound's level, in decibels (dB).\nThis affects how far the sound can be heard.\nBelow 1 dB sounds play globally. Values above 160 dB might reduce the volume.\nIf you're not sure, use 75 dB." )
 			function levelSlider:OnValueChanged( value )
 				self:SetValue( math.Clamp( value, 0, self:GetMax() ) ) -- visual
 				self:SetValue( math.SnapTo( value,1 ) )
@@ -407,7 +428,8 @@ function TOOL.BuildCPanel(cPanel)
 
 
 		local dspBigHelp = soundEffectsSheet:Help( l( "dsp" ) .. ":" )
-			dspBigHelp:SetTooltip( "Apply reverb, delay, stereo effect, tone, etc .. \nCheck the wiki for more info.\nhttps://wiki.facepunch.com/gmod/DSP_Presets" )
+			dspBigHelp:DockMargin( 0, 10, 0, 0 )
+			soundEffectsSheet:ControlHelp( "DSP (Digital Signal Processing) is used to modify certain characteristics of a sound when it is played, such as reverb, delay, stereo effects, tone, etc." )
 
 		local dspComboBox, dspComboBoxLabel = soundEffectsSheet:ComboBox( "Choose:", pre .. "dsp" )
 			dspComboBoxLabel:SetWide( 60 )
@@ -426,17 +448,29 @@ function TOOL.BuildCPanel(cPanel)
 				dspHelp:SetText( text )
 			end
 
+		local effectsResetButton = vgui.Create( "DButton", soundEffectsSheet )
+		soundEffectsSheet:AddItem( effectsResetButton )
+		effectsResetButton:SetText( "Reset to default values" )
+		effectsResetButton:SetImage( "icon16/arrow_rotate_clockwise.png" )
+		effectsResetButton:DockMargin( 40, 15, 40, 0 )
+		function effectsResetButton:DoClick()
+			for _, suffix in ipairs( { "volume", "sndlvl", "pitch", "pitchrandamp", "usescriptpitch", "dsp" } ) do
+				local cVar = GetConVar( mode .. "_" .. suffix )
+				if cVar then cVar:Revert() end
+			end
+		end
 
-	local soundTimingSheet = createSheet( "Timing", "icon16/clock_edit.png" )
+
+	local soundTimingSheet = createSheet( "Timing", "icon16/clock.png" )
 
 		local delaySlider = soundTimingSheet:NumSlider( l( "delay" ) .. ":", pre .. "delay", 0, 100 )
-			delaySlider:SetTooltip( "How many seconds to wait before starting the sound emitter." )
+			delaySlider:SetTooltip( "Play the sound only after a set amount of seconds.\nThis doesn't do anything during loops." )
 
 		lengthSlider = soundTimingSheet:NumSlider( l( "length" ) .. ":", pre .. "length", 0, 100 )
-			lengthSlider:SetTooltip( "How many seconds before the sound emitter turns off, when the sound is started.\nThis also works during loops.\nSet to 0 or below to never stop." )
+			lengthSlider:SetTooltip( "Forcefully stop the sound after a set amount of seconds.\nThis also works during loops.\nSet to 0 or less to never stop." )
 
 		local autoCheck = soundTimingSheet:CheckBox( l( "autolength" ), pre .. "autolength" )
-			autoCheck:SetTooltip( "Set the play length to an approximation of the length of the sound.\nThis isn't always accurate." )
+			autoCheck:SetTooltip( "Set the play length to the approximate length of the sound.\nThis might not always be accurate." )
 			function autoCheck:OnChange( isChecked )
 				lengthSlider:SetEnabled( not isChecked )
 				lengthSlider:SetDark( not isChecked ) -- otherwise it stays gray sometimes for some reason ??
@@ -459,10 +493,7 @@ function TOOL.BuildCPanel(cPanel)
 		end
 
 		local loopSlider = soundTimingSheet:NumSlider( l( "looplength" ) .. ":", pre .. "looplength", 0, 100 )
-			loopSlider:SetTooltip( "How often the sound replays, in seconds.\nSet to 0 or below for never (no looping)." )
-
-		local maxLoopCountSlider = soundTimingSheet:NumSlider( l( "maxloopcount" ) .. ":", pre .. "maxloopcount", -1, 20, 0 )
-			maxLoopCountSlider:SetTooltip( "How many times the sound will re-play after the first time.\nSet to -1 for infinite looping.\nSet to 0 for no looping." )
+			loopSlider:SetTooltip( "The stop-and-replay delay, in seconds.\nSet to 0 to never replay." )
 
 		local sameCheck = soundTimingSheet:CheckBox( l( "samelength" ), pre .. "samelength" )
 			sameCheck:SetTooltip( "Set the Loop Length to the same duration as the Play Length." )
@@ -474,11 +505,14 @@ function TOOL.BuildCPanel(cPanel)
 				end
 			end
 
+		local maxLoopCountSlider = soundTimingSheet:NumSlider( l( "maxloopcount" ) .. ":", pre .. "maxloopcount", -1, 20, 0 )
+			maxLoopCountSlider:SetTooltip( "How many times the sound will replay after the first time.\nOnly works if the loop length is greater than 0.\nSet to -1 for infinite replays.\nSet to 0 for no replay." )
+
 		local fadeInSlider = soundTimingSheet:NumSlider( l( "fadein" ) .. ":", pre .. "fadein", 0, 10 )
 			fadeInSlider:SetTooltip( "How many seconds it takes for the sound's volume to reach its max anytime its played." )
 
 		local fadeOutSlider = soundTimingSheet:NumSlider( l( "fadeout" ) .. ":", pre .. "fadeout", 0, 10 )
-			fadeOutSlider:SetTooltip( "How many seconds it takes for the volume to drop to zero.\nFade out will begin:\n- (" .. l( "length" ) .. " - " .. l( "fadeout" ) .. ") second(s) after the sound's start\n- Whenever the sound is stopped manually." )
+			fadeOutSlider:SetTooltip( "How many seconds it takes for the volume to drop to zero once it starts fading out.\nFade out will begin:\n- (" .. l( "length" ) .. " - " .. l( "fadeout" ) .. ") second(s) after the sound's start\n- Whenever the sound is stopped manually." )
 
 		function lengthSlider.Scratch:OnValueChanged( value )
 			if sameCheck:GetChecked() then
@@ -487,11 +521,17 @@ function TOOL.BuildCPanel(cPanel)
 			end
 		end
 
-
-
-	local modelSheet = createSheet( "Model", "icon16/eye.png", vgui.Create( "ControlPanel" ) )
-		modelSheet:PropSelect( "Preset models", pre .. "model", list.Get( "MVSoundEmitterExtModel" ), 3 )
-		modelSheet:TextEntry( "Model name:", pre .. "model" )
+		local timingResetButton = vgui.Create( "DButton", soundTimingSheet )
+		soundTimingSheet:AddItem( timingResetButton )
+		timingResetButton:SetText( "Reset to default values" )
+		timingResetButton:SetImage( "icon16/arrow_rotate_clockwise.png" )
+		timingResetButton:DockMargin( 40, 15, 40, 0 )
+		function timingResetButton:DoClick()
+			for _, suffix in ipairs( { "delay", "length", "autolength", "looplength", "samelength", "maxloopcount", "fadein", "fadeout" } ) do
+				local cVar = GetConVar( mode .. "_" .. suffix )
+				if cVar then cVar:Revert() end
+			end
+		end
 
 
 	previewButton, stopButton = vgui.Create( "DButton" ), vgui.Create( "DButton" )
@@ -555,6 +595,6 @@ function TOOL:Think()
 		self:MakeGhostEntity( model, vector_origin, angle_zero )
 	end
 
-	self:UpdateGhostMVSoundEmitter( ent, self:GetOwner() )
+	self:UpdateGhostMVSoundEmitter( self.GhostEntity, self:GetOwner() )
 
 end

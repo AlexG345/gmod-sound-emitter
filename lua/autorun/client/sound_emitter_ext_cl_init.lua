@@ -1,110 +1,109 @@
-local soundCache = {}
-local queue = { "" }
-local filter = nil
+-- local soundCache = {}
+-- local queue = { "" }
+-- local filter = nil
 
-hook.Add("Think", "BuildSoundCache", function()
-	local maxFolders = 8 -- tune this
+-- hook.Add("Think", "BuildSoundCache", function()
+-- 	local maxFolders = 8 --
 
-	print("...")
-	for i = 1, maxFolders do
-		if #queue == 0 then
-			hook.Remove( "Think", "BuildSoundCache" )
-			print( "Finished indexing sounds" )
-			soundCache = table.SortByKey( soundCache, true )
-			return
-		end
+-- 	print("...")
+-- 	for i = 1, maxFolders do
+-- 		if #queue == 0 then
+-- 			hook.Remove( "Think", "BuildSoundCache" )
+-- 			print( "Finished indexing sounds" )
+-- 			soundCache = table.SortByKey( soundCache, true )
+-- 			return
+-- 		end
 
-		local path = table.remove(queue, 1)
+-- 		local path = table.remove(queue, 1)
 
-		local files, folders = file.Find( "sound/" .. path .. "*", "GAME")
+-- 		local files, folders = file.Find( "sound/" .. path .. "*", "GAME")
 
-		for _, fileName in ipairs(files) do
-			local filePath			= path .. fileName
-			soundCache[filePath]	= filePath
-		end
+-- 		for _, fileName in ipairs(files) do
+-- 			local filePath			= path .. fileName
+-- 			soundCache[filePath]	= filePath
+-- 		end
 
-		for _, folderName in ipairs(folders) do
-			queue[#queue + 1] = path .. folderName .. "/"
-		end
-	end
+-- 		for _, folderName in ipairs(folders) do
+-- 			queue[#queue + 1] = path .. folderName .. "/"
+-- 		end
+-- 	end
 
-end)
-
-
-function MVSoundEmitter.OpenSoundBrowser()
-	local frame = vgui.Create( "DFrame" )
-	frame:SetSize( 600, 400 )
-	frame:Center()
-	frame:MakePopup()
-
-	-- mostly just from https://wiki.facepunch.com/gmod/DFileBrowser
-
-	local search = vgui.Create( "DTextEntry", frame )
-	search:Dock( TOP )
+-- end)
 
 
-	-- -- Define what should happen when a file is double-clicked in the browser
-	-- browser.OnDoubleClick = function(panel, path)
-	-- 	if s ~= nil then s:Stop() end  -- If a sound is currently playing, stop it
-	-- 	-- Select the sound and set it as the value of our ConVar, remove the "sound/" part from the path
-	-- 	GetConVar( "mv_soundemitter_ext_sound" ):SetString( string.Replace( path, "sound/", "" ) )
-	-- 	frame:Close()  -- Close the frame
-	-- end
+-- function MVSoundEmitter.OpenSoundBrowser()
+-- 	local frame = vgui.Create( "DFrame" )
+-- 	frame:SetSize( 600, 400 )
+-- 	frame:Center()
+-- 	frame:MakePopup()
 
-	-- -- Define what should happen when a file is clicked in the browser
-	-- browser.OnSelect = function(panel, path)
+-- 	-- mostly just from https://wiki.facepunch.com/gmod/DFileBrowser
 
-	-- end
+-- 	local search = vgui.Create( "DTextEntry", frame )
+-- 	search:Dock( TOP )
 
-	local listView = vgui.Create( "DListView", frame )
-	listView:Dock( FILL )
+-- 	-- -- Define what should happen when a file is double-clicked in the browser
+-- 	-- browser.OnDoubleClick = function(panel, path)
+-- 	-- 	if s ~= nil then s:Stop() end  -- If a sound is currently playing, stop it
+-- 	-- 	-- Select the sound and set it as the value of our ConVar, remove the "sound/" part from the path
+-- 	-- 	GetConVar( "mv_soundemitter_ext_sound" ):SetString( string.Replace( path, "sound/", "" ) )
+-- 	-- 	frame:Close()  -- Close the frame
+-- 	-- end
 
-	listView:SetMultiSelect( false )
-	listView:AddColumn( "Path" )
+-- 	-- -- Define what should happen when a file is clicked in the browser
+-- 	-- browser.OnSelect = function(panel, path)
 
-	local s -- Initialize a local var to hold the preview sound
-	function listView:DoDoubleClick( _, line )
-		if s ~= nil then s:Stop() end  -- If a sound is currently playing, stop it
-		local soundName = line:GetValue( 1 )
-		s = CreateSound( LocalPlayer(), string.Replace( soundName, "sound/", "" ) )  -- Create and play a new sound from the selected file
-		s:Play()
-	end
+-- 	-- end
 
-	function listView:OnRowRightClick( _,  line )
-		SetClipboardText( line:GetValue( 1 ) )
-	end
+-- 	local listView = vgui.Create( "DListView", frame )
+-- 	listView:Dock( FILL )
 
-	local function refreshListView()
+-- 	listView:SetMultiSelect( false )
+-- 	listView:AddColumn( "Path" )
 
-		filter = filter or "."
+-- 	local s -- Initialize a local var to hold the preview sound
+-- 	function listView:DoDoubleClick( _, line )
+-- 		if s ~= nil then s:Stop() end  -- If a sound is currently playing, stop it
+-- 		local soundName = line:GetValue( 1 )
+-- 		s = CreateSound( LocalPlayer(), string.Replace( soundName, "sound/", "" ) )  -- Create and play a new sound from the selected file
+-- 		s:Play()
+-- 	end
 
-		listView:Clear()
-		local count = 0
+-- 	function listView:OnRowRightClick( _,  line )
+-- 		SetClipboardText( line:GetValue( 1 ) )
+-- 	end
 
-		for _, path in ipairs( soundCache ) do
-			if path:lower():find( filter, 1 ) then
-				listView:AddLine(path)
-				count = count + 1
+-- 	local function refreshListView()
 
-				if count >= 1000 then
-					break
-				end
-			end
-		end
-	end
+-- 		filter = filter or "."
 
-	function search:OnChange()
+-- 		listView:Clear()
+-- 		local count = 0
 
-		filter = self:GetValue():lower()
-		refreshListView()
+-- 		for _, path in ipairs( soundCache ) do
+-- 			if path:lower():find( filter, 1 ) then
+-- 				listView:AddLine(path)
+-- 				count = count + 1
 
-	end
+-- 				if count >= 1000 then
+-- 					break
+-- 				end
+-- 			end
+-- 		end
+-- 	end
 
-	refreshListView()
+-- 	function search:OnChange()
 
-	search:SetText( filter )
+-- 		filter = self:GetValue():lower()
+-- 		refreshListView()
 
-end
+-- 	end
+
+-- 	refreshListView()
+
+-- 	search:SetText( filter )
+
+-- end
 
 
 -- Returns the average pitch of a sound script
