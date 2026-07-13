@@ -70,11 +70,6 @@ MVSoundEmitter.soundEmitterProperties = MVSoundEmitter.ToSoundEmitterProperties(
 )
 
 
-function MVSoundEmitter.IsSoundEmitter( ent )
-	return isentity( ent ) and ent:IsValid() and ent:GetClass() == "mv_soundemitter"
-end
-
-
 
 function MVSoundEmitter.UpdateSoundEmitter( emitter, ply, properties )
 
