@@ -297,7 +297,7 @@ function TOOL.BuildCPanel(cPanel)
 		modelSheet:TextEntry( "Model name:", pre .. "model" )
 
 
-	local soundNameSheet = createSheet( "Sound name", "icon16/folder_find.png" )
+	local soundNameSheet = createSheet( "Sound name", "icon16/page_find.png" )
 
 		local sndList = vgui.Create( "DListView" )
 		soundNameSheet:AddItem( sndList )
@@ -319,6 +319,14 @@ function TOOL.BuildCPanel(cPanel)
 		local soundTextEntry = soundNameSheet:TextEntry( l( "sound" ) .. ":", pre .. "sound" )
 			soundTextEntry:SetTooltip( "A sound from the game content.\nSupports soundscripts, .mp3, .ogg, .wav." )
 
+		local soundBrowserButton = vgui.Create( "DButton" )
+		soundNameSheet:AddItem( soundBrowserButton )
+		soundBrowserButton:SetText( "Open Sound Browser" )
+		soundBrowserButton:SetImage( "icon16/find.png" )
+		function soundBrowserButton:DoClick()
+			MVSoundEmitter.OpenSoundBrowser()
+		end
+
 		-- Helper button for stream radios
 		if scripted_ents.Get( "base_streamradio" ) then
 			local streamRadioButton = vgui.Create( "DButton" )
@@ -329,14 +337,6 @@ function TOOL.BuildCPanel(cPanel)
 				RunConsoleCommand( "streamradio_streamurl",soundConVar:GetString() )
 				ply:EmitSound( "ambient/levels/prison/radio_random" .. math.random( 3, 14 ) .. ".wav" )
 			end
-
-			-- local soundBrowserButton = vgui.Create( "DButton" )
-			-- soundNameSheet:AddItem( soundBrowserButton )
-			-- soundBrowserButton:SetText( "Open Sound Browser" )
-			-- soundBrowserButton:SetImage( "icon16/phone_sound.png" )
-			-- function soundBrowserButton:DoClick()
-			-- 	MVSoundEmitter.OpenSoundBrowser()
-			-- end
 		end
 
 

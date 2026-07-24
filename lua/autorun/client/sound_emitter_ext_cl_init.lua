@@ -1,109 +1,164 @@
--- local soundCache = {}
--- local queue = { "" }
--- local filter = nil
+MVSoundEmitter.soundCache			= {}
+MVSoundEmitter.soundCacheLoaded		= false
 
--- hook.Add("Think", "BuildSoundCache", function()
--- 	local maxFolders = 8 --
+function MVSoundEmitter.BuildSoundCache( openMenu )
 
--- 	print("...")
--- 	for i = 1, maxFolders do
--- 		if #queue == 0 then
--- 			hook.Remove( "Think", "BuildSoundCache" )
--- 			print( "Finished indexing sounds" )
--- 			soundCache = table.SortByKey( soundCache, true )
--- 			return
--- 		end
+	if MVSoundEmitter.soundCacheLoading then return end
 
--- 		local path = table.remove(queue, 1)
+	chat.AddText(
+		Color( 20, 200, 255 ),
+		"[Sound Emitter]",
+		color_white,
+		" Loading sounds..."
+	)
 
--- 		local files, folders = file.Find( "sound/" .. path .. "*", "GAME")
+	MVSoundEmitter.soundCache			= {}
+	MVSoundEmitter.soundCacheLoaded		= false
+	MVSoundEmitter.soundCacheLoading	= true
 
--- 		for _, fileName in ipairs(files) do
--- 			local filePath			= path .. fileName
--- 			soundCache[filePath]	= filePath
--- 		end
+	local queue					= { "" }
+	local maxFolders			= 8
 
--- 		for _, folderName in ipairs(folders) do
--- 			queue[#queue + 1] = path .. folderName .. "/"
--- 		end
--- 	end
+	hook.Add( "Think", "sound_emitter_build_sound_cache", function()
 
--- end)
+		for i = 1, maxFolders do
+
+			if #queue == 0 then
+
+				hook.Remove( "Think", "sound_emitter_build_sound_cache" )
+
+				MVSoundEmitter.soundCacheLoaded		= true
+				MVSoundEmitter.soundCacheLoading	= false
+				MVSoundEmitter.soundCache			= table.SortByKey( MVSoundEmitter.soundCache, true )
+				if openMenu then MVSoundEmitter.OpenSoundBrowser() end
+
+				return
+
+			end
+
+			local path = table.remove( queue, 1 )
+
+			local files, folders = file.Find( "sound/" .. path .. "*", "GAME" )
+
+			for _, fileName in ipairs(files) do
+
+				local filePath			= path .. fileName
+				MVSoundEmitter.soundCache[filePath]	= filePath
+
+			end
+
+			for _, folderName in ipairs(folders) do
+
+				queue[#queue + 1] = path .. folderName .. "/"
+
+			end
+		end
+
+	end)
+end
 
 
--- function MVSoundEmitter.OpenSoundBrowser()
--- 	local frame = vgui.Create( "DFrame" )
--- 	frame:SetSize( 600, 400 )
--- 	frame:Center()
--- 	frame:MakePopup()
+local filter		= nil
+local maxEntries	= 100
+local frame			= nil
 
--- 	-- mostly just from https://wiki.facepunch.com/gmod/DFileBrowser
+function MVSoundEmitter.OpenSoundBrowser()
 
--- 	local search = vgui.Create( "DTextEntry", frame )
--- 	search:Dock( TOP )
+	if not MVSoundEmitter.soundCacheLoaded then
+		MVSoundEmitter.BuildSoundCache( true )
+		return
+	end
 
--- 	-- -- Define what should happen when a file is double-clicked in the browser
--- 	-- browser.OnDoubleClick = function(panel, path)
--- 	-- 	if s ~= nil then s:Stop() end  -- If a sound is currently playing, stop it
--- 	-- 	-- Select the sound and set it as the value of our ConVar, remove the "sound/" part from the path
--- 	-- 	GetConVar( "mv_soundemitter_ext_sound" ):SetString( string.Replace( path, "sound/", "" ) )
--- 	-- 	frame:Close()  -- Close the frame
--- 	-- end
+	local refreshListView
 
--- 	-- -- Define what should happen when a file is clicked in the browser
--- 	-- browser.OnSelect = function(panel, path)
+	if IsValid( frame ) then frame:Remove() end
 
--- 	-- end
+	frame = vgui.Create( "DFrame" )
+		frame:SetTitle( "Sound Browser")
+		frame:SetSize( 600, 400 )
+		frame:Center()
+		frame:MakePopup()
 
--- 	local listView = vgui.Create( "DListView", frame )
--- 	listView:Dock( FILL )
+		-- mostly just from https://wiki.facepunch.com/gmod/DFileBrowser
 
--- 	listView:SetMultiSelect( false )
--- 	listView:AddColumn( "Path" )
+		local maxEntriesSlider = vgui.Create( "DNumSlider", frame )
+			maxEntriesSlider:SetText( "Max entries:" )
+			maxEntriesSlider:SetWide( 300 )
+			maxEntriesSlider:SetMax( 600 )
+			maxEntriesSlider:SetDecimals( 0 )
+			maxEntriesSlider:SetValue( maxEntries )
+			maxEntriesSlider:SetDefaultValue( 100 )
+			maxEntriesSlider:SetMin( 1 )
+			maxEntriesSlider:Dock( TOP )
+			function maxEntriesSlider:OnValueChanged( value )
+				maxEntries = self:GetValue()
+				refreshListView()
+			end
 
--- 	local s -- Initialize a local var to hold the preview sound
--- 	function listView:DoDoubleClick( _, line )
--- 		if s ~= nil then s:Stop() end  -- If a sound is currently playing, stop it
--- 		local soundName = line:GetValue( 1 )
--- 		s = CreateSound( LocalPlayer(), string.Replace( soundName, "sound/", "" ) )  -- Create and play a new sound from the selected file
--- 		s:Play()
--- 	end
+		local search = vgui.Create( "DTextEntry", frame )
+			search:Dock( TOP )
+			search:SetPlaceholderText( "Search..." )
 
--- 	function listView:OnRowRightClick( _,  line )
--- 		SetClipboardText( line:GetValue( 1 ) )
--- 	end
+		local listView = vgui.Create( "DListView", frame )
+			listView:Dock( FILL )
+			listView:SetMultiSelect( false )
+			listView:AddColumn( "Sound name" )
 
--- 	local function refreshListView()
+			local s -- Initialize a local var to hold the preview sound
+			function listView:DoDoubleClick( _, line )
+				if s ~= nil then s:Stop() end  -- If a sound is currently playing, stop it
+				local soundName = line:GetValue( 1 )
+				s = CreateSound( LocalPlayer(), string.Replace( soundName, "sound/", "" ) )  -- Create and play a new sound from the selected file
+				s:Play()
+			end
 
--- 		filter = filter or "."
+			function listView:OnRowRightClick( _,  line )
+				SetClipboardText( line:GetValue( 1 ) )
+			end
 
--- 		listView:Clear()
--- 		local count = 0
+		function refreshListView()
 
--- 		for _, path in ipairs( soundCache ) do
--- 			if path:lower():find( filter, 1 ) then
--- 				listView:AddLine(path)
--- 				count = count + 1
+			filter = filter or "."
 
--- 				if count >= 1000 then
--- 					break
--- 				end
--- 			end
--- 		end
--- 	end
+			listView:Clear()
+			local count		= 0
 
--- 	function search:OnChange()
+			for _, path in ipairs( MVSoundEmitter.soundCache ) do
+				if path:lower():find( filter, 1 ) then
+					listView:AddLine(path)
+					count = count + 1
 
--- 		filter = self:GetValue():lower()
--- 		refreshListView()
+					if count >= maxEntries then
+						break
+					end
+				end
+			end
+		end
 
--- 	end
+		function search:OnChange()
 
--- 	refreshListView()
+			filter = self:GetValue():lower()
+			refreshListView()
 
--- 	search:SetText( filter )
+		end
 
--- end
+		refreshListView()
+
+		search:SetText( filter ~= "." and filter or "" )
+
+		local helpLabel = vgui.Create( "DLabel", frame )
+			helpLabel:DockMargin( 4, 8, 4, 8 )
+			helpLabel:Dock( BOTTOM )
+			helpLabel:SetAutoStretchVertical( true )
+			helpLabel:SetText( "Double click: Play sound\nRight click: Copy sound\nClick on the frame: Stop current sound")
+
+		function frame:OnMousePressed()
+			if s ~= nil then s:Stop() end
+		end
+
+end
+
+concommand.Add( "soundemitter_open_sound_browser", MVSoundEmitter.OpenSoundBrowser )
 
 
 -- Returns the average pitch of a sound script
